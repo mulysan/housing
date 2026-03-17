@@ -1,0 +1,7 @@
+﻿metric,pearson_r,pearson_p,spearman_r,spearman_p,n,significant_pearson,significant_spearman
+junction_density,0.54,0.0116,0.474,0.0299,21,True,True
+street_density_km_km2,0.633,0.0021,0.644,0.0016,21,True,True
+dead_end_ratio,0.212,0.3556,0.277,0.2246,21,False,False
+circuity_avg,0.299,0.1874,0.232,0.3118,21,False,False
+amenity_density,0.636,0.0019,0.47,0.0317,21,True,True
+walkability_index,0.438,0.047,0.359,0.1105,21,True,False
