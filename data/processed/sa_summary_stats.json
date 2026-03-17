@@ -1,0 +1,18 @@
+{
+  "city_level": {
+    "n_cities": 20,
+    "total_gush_blocks": 57007,
+    "total_transactions": 655018,
+    "median_price_usd": 349214.2857142857,
+    "mean_gush_per_city": 2850.35,
+    "avg_price_cv": 3.5902543259097626
+  },
+  "gush_level": {
+    "n_observations": 57007,
+    "median_price_usd": 362000.0,
+    "std_price_usd": 3365737.790753063,
+    "min_price_usd": 14285.714285714284,
+    "max_price_usd": 512455714.28571427,
+    "avg_txns_per_block": 11.490132790709913
+  }
+}
