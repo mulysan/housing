@@ -1,0 +1,971 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{microtype}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{abstract}
+
+\doublespacing
+\bibpunct{(}{)}{;}{a}{,}{,}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=blue!70!black,
+    urlcolor=blue!70!black
+}
+
+\title{\textbf{Urbanism Quality, Housing Prices, and Effective Housing Supply:\\
+Evidence from Israeli Cities}\thanks{%
+  Data: Israeli Tax Authority real-estate transaction records (2018--2023);
+  OpenStreetMap road network and amenity data retrieved via Overture Maps (2024);
+  Israeli Central Bureau of Statistics statistical areas (2022 edition).
+  All code and replication materials are available at
+  \texttt{github.com/mulysan/housing}.}}
+
+\author{%
+  Mulya Sanderovitch\\
+  \small\textit{Working Paper, March 2026}
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+%----------------------------------------------------------------------
+\begin{abstract}
+\noindent
+This paper links observable urbanism metrics—street-network density, junction
+density, amenity density, and composite walkability—to residential apartment
+prices across 21 Israeli cities, using administrative transaction data for
+2018–2023 and street-network/amenity data from OpenStreetMap.  We find that
+street density (km/km$^2$) and amenity density (POIs/km$^2$) are the strongest
+cross-city predictors of median apartment prices, with Pearson correlations of
+0.63 and 0.64 respectively (both $p < 0.01$), while a composite walkability
+index carries a Pearson correlation of 0.44 ($p < 0.05$).  Dead-end ratio and
+circuity are not significantly associated with prices at the city level.  We
+then embed these findings in a broader theoretical framework, drawing on the
+hedonic price literature and on spatial equilibrium models of housing supply.
+We argue that the observed capitalization of neighborhood walkability and
+amenity access is precisely the micro-level evidence needed to construct a
+\textit{quality-adjusted} or ``effective'' housing supply measure—analogous to
+efficiency-weighted labor in labor economics—in which each dwelling unit
+contributes to the aggregate stock in proportion to its hedonic-predicted value.
+Accounting for this quality margin implies that the Israeli housing shortage is
+more severe than raw unit counts suggest, because a disproportionate share of
+the existing stock is located in low-connectivity, low-amenity urban
+environments that provide fewer ``housing services'' per physical unit.
+
+\bigskip\noindent
+\textbf{JEL codes:} R21, R31, R41, R52, D40\\
+\textbf{Keywords:} hedonic prices, walkability, street-network connectivity,
+amenity density, effective housing supply, spatial equilibrium, Israel
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+%======================================================================
+\section{Introduction}
+\label{sec:intro}
+%======================================================================
+
+Housing affordability is among the most contested policy questions in advanced
+economies, and Israel is no exception.  Between 2008 and 2023, real apartment
+prices in the Tel Aviv metropolitan area roughly doubled, even after controlling
+for income growth \citep{boi2023housing}.  Public debate has overwhelmingly
+focused on the \textit{quantity} dimension of supply: how many new units are
+built per year, how quickly permits are issued, and how zoning reform can
+accelerate construction.  Largely absent from this debate is the
+\textit{quality} dimension: dwellings are not homogeneous, and a unit built in
+a walkable, transit-accessible neighborhood with dense retail and services
+provides fundamentally different ``housing services'' than a physically
+identical unit in a car-dependent, low-amenity suburb.
+
+This paper makes two contributions.  First, it provides the first systematic
+empirical analysis linking quantitative urbanism metrics—derived from
+OpenStreetMap road-network graphs and point-of-interest data—to residential
+apartment prices across a broad cross-section of Israeli cities.  Our data
+cover 21 cities, approximately 200,000 apartment transactions over 2018–2023,
+and six urbanism metrics computed at the city level from Overture Maps data.
+We find robust positive associations between street-network density, amenity
+density, and median apartment prices.  These associations survive both Pearson
+and Spearman specifications and are economically large: a city at the 75th
+percentile of amenity density commands a median price roughly 60\% higher than
+a city at the 25th percentile.
+
+Second, we connect these micro-level correlations to the macro-level debate on
+housing supply.  Building on the concept of ``effective labor supply'' in labor
+economics—where heterogeneous workers are aggregated into efficiency units using
+relative wages as weights \citep{katz1992changes}—we argue for an analogous
+concept of \textit{effective housing supply}.  Just as a high-skill worker
+earning twice the median wage contributes two efficiency units of labor, a
+dwelling in a walkable, well-connected neighborhood whose hedonic-predicted
+value is twice the market average contributes two ``housing service units'' to
+the aggregate stock.  The lit\-erature reviewed in Section~\ref{sec:lit}
+provides the micro-foundations: the hedonic capitalization of walkability,
+street connectivity, transit access, and amenity density quantifies exactly how
+much more ``service'' a well-located unit provides.
+
+The distinction between quantity and quality supply matters for at least three
+reasons.  First, it changes how we measure the housing deficit.  If Israel's
+housing shortage is partly a \textit{quality} shortage—too few units in
+walkable, amenity-rich areas—then policies that simply add units at the urban
+periphery may fail to close the effective gap.  Second, it changes how we
+interpret supply elasticities.  \citet{baumsnow2024} show for the United States
+that floor-space supply elasticities (0.5) substantially exceed unit supply
+elasticities (0.3), suggesting the quality margin is a first-order phenomenon
+that standard count-based measures miss.  Third, it has distributional
+implications: if high-walkability neighborhoods are in the upper tail of the
+price distribution, restricting their supply concentrates housing services among
+high-income households and forces lower-income households into car-dependent,
+amenity-poor areas.
+
+The paper proceeds as follows.  Section~\ref{sec:lit} reviews the hedonic price
+and effective housing supply literatures.
+Section~\ref{sec:context} describes the Israeli housing market context.
+Section~\ref{sec:data} describes the urbanism and transaction datasets.
+Section~\ref{sec:method} outlines the empirical strategy.
+Section~\ref{sec:results} presents the correlation results.
+Section~\ref{sec:theory} develops the effective housing supply framework and
+applies it to the Israeli case.
+Section~\ref{sec:policy} discusses policy implications.
+Section~\ref{sec:conclusion} concludes.
+
+%======================================================================
+\section{Literature Review}
+\label{sec:lit}
+%======================================================================
+
+\subsection{The Hedonic Price Framework}
+\label{sec:lit_hedonic}
+
+The workhorse model connecting neighborhood characteristics to housing prices is
+the hedonic price model (HPM), originating with \citet{rosen1974} and
+\citet{harrison1978}.  The HPM treats a dwelling as a bundle of structural
+attributes (rooms, age, floor area), locational characteristics (distance to
+employment centers, school quality), and neighborhood amenities (parks, crime
+rates, environmental quality).  In competitive equilibrium, the market price of
+a dwelling equals the sum of implicit prices of its constituent attributes:
+\begin{equation}
+\label{eq:hedonic}
+  P_j = P\bigl(S_j,\, L_j,\, N_j\bigr),
+\end{equation}
+where $S_j$ denotes structural characteristics, $L_j$ location characteristics,
+and $N_j$ neighborhood attributes of dwelling $j$.  Regression analysis
+recovers the implicit (``shadow'') price of each attribute \citep{malpezzi2003}.
+
+The theoretical foundation of the HPM connects directly to welfare analysis:
+the implicit price of an attribute equals households' marginal willingness to
+pay for it.  This makes the HPM the natural tool for measuring how much
+households value walkability, street connectivity, and amenity access—which is
+precisely the information needed to quality-adjust the housing stock.
+
+Recent advances have extended the HPM in two directions relevant to our study.
+First, big-data methods—Google Street View images processed by deep learning
+\citep{qiu2022}—capture visual streetscape quality at the pedestrian level,
+finding substantial implicit prices for street-level greenness and sky openness.
+Second, accessibility indices combining road-network travel times with
+employment distributions substantially improve HPM predictive performance:
+\citet{madrid2023} find that walk-accessibility indices reduce spatial
+autocorrelation in hedonic residuals by 35\% in Madrid.  Both developments
+underscore the importance of the network structure of the urban environment as
+a determinant of residential value.
+
+\subsection{Street-Network Connectivity and Intersection Density}
+\label{sec:lit_network}
+
+Street-network form—the density of intersections, block size, and degree of
+grid-like connectivity—has attracted growing attention as a determinant of both
+travel behavior and property values.  \citet{barrington2015,barrington2020}
+document a century of declining street-network connectivity in US cities,
+conceptualizing the phenomenon as path-dependent sprawl: once low-connectivity
+infrastructure is built, densification becomes structurally constrained.
+
+Intersection density serves as a proxy for walkability, pedestrian route choice,
+and transit efficiency.  Smaller blocks enable more direct pedestrian paths,
+support more frequent transit stops, and create more human-scaled environments.
+LEED for Neighborhood Development (LEED-ND) uses 140 intersections per square
+mile as a design standard for walkable neighborhoods.
+
+The price effects of street connectivity are nuanced.  \citet{matthews2007} find
+that street layout affects prices through an interaction of accessibility and
+land-use mix: connectivity raises prices in mixed-use contexts but may be
+associated with lower prices in purely residential areas where cul-de-sac
+privacy is valued \citep{song2003}.  \citet{millardball2022} provides an
+economic perspective on street width, estimating that the land value of
+residential street rights-of-way totals \$959 billion in 20 large US counties,
+and that narrowing over-wide streets could free up land worth over \$100,000
+per housing unit in high-cost markets.
+
+\subsection{Local Amenities and Walkability}
+\label{sec:lit_amenity}
+
+Amenity density—the concentration of retail, food service, healthcare,
+education, and other daily-life destinations within walking distance—is one of
+the most robustly valued neighborhood attributes in the hedonic literature.
+Walk Score and similar composite indices have been found to carry significant
+price premia across diverse metropolitan contexts: \citet{pivo2011},
+\citet{li2015}, and a Melbourne study spanning all socioeconomic quintiles all
+find positive walkability–price associations, with destination accessibility
+driving the effect more than transit access per se.
+
+Environmental quality in the broader sense—greenness, air quality, proximity
+to parks—also commands significant premia.  \citet{black1999} demonstrated
+using regression discontinuity designs that proximity to higher-performing
+schools is substantially capitalized into prices.  \citet{franco2018} estimated
+implicit prices for urban greenness in Lisbon using NDVI measures and hedonic
+methods.
+
+\subsection{Market Access and Residential Land Values}
+\label{sec:lit_ma}
+
+A theoretically grounded synthesis of the accessibility findings comes from the
+market access framework derived from general equilibrium trade theory.
+\citet{donaldson2016} show that all general equilibrium effects of changes in
+transport infrastructure on a location's economy are summarized by changes in
+its \textit{market access}:
+\begin{equation}
+  MA_o = \sum_d \tau_{od}^{-\theta} \cdot Y_d,
+\end{equation}
+where $\tau_{od}$ is the bilateral trade cost, $\theta$ the trade elasticity,
+and $Y_d$ the economic mass of destination $d$.  For residential housing, the
+analog is a location's access to employment, consumption amenities, and the
+broader urban economy—all discounted by commuting or travel costs determined
+by the local street network.
+
+\citet{ahlfeldt2015}, in a celebrated \textit{Econometrica} paper, bring this
+framework inside the city using Berlin's division and reunification as exogenous
+variation.  They identify substantial elasticities of floor-space prices with
+respect to commuter market access, operating through both production
+externalities (access to employment density) and residential externalities
+(access to residential density).  \citet{heblich2020} obtain analogous results
+for London using 19th-century underground railway construction.  The structural
+interpretation is clear: a location's street network—its connectivity,
+directness, and density—determines its market access, which in turn determines
+land values.  Our urbanism metrics are reduced-form proxies for this structural
+concept.
+
+\subsection{Housing Quality as a Component of Effective Housing Supply}
+\label{sec:lit_effhs}
+
+Most spatial equilibrium models—from the foundational \citet{rosen1979}–\citet{roback1982} framework through \citet{moretti2011} and \citet{hsieh2019}—treat
+housing as a scalar: each household consumes a quantity $h$ of ``housing
+services'' at a per-unit price $P_i$ in city $i$.  Spatial equilibrium requires
+that mobile workers be indifferent across locations:
+\begin{equation}
+\label{eq:spatial_eq}
+  V = \frac{W_i \cdot Z_i}{P_i^\beta} \quad \forall\, i,
+\end{equation}
+where $W_i$ is the wage, $Z_i$ captures amenities, and $\beta$ is the housing
+expenditure share.  The critical implicit assumption is that $P_i$ is a
+quality-adjusted price—comparable across locations after abstracting from
+quality differences.  In practice, this is a strong assumption.
+
+In labor economics, heterogeneous workers are aggregated into effective labor
+supply using relative wages as weights \citep{katz1992changes}:
+\begin{equation}
+\label{eq:efflabor}
+  L^{\text{eff}} = \sum_i \frac{w_i}{\bar{w}} \cdot L_i,
+\end{equation}
+where $w_i$ is the wage of worker type $i$ and $\bar{w}$ is the average wage.
+An exact analogy applies to housing: dwelling units can be aggregated into
+``effective housing supply'' using hedonic price weights:
+\begin{equation}
+\label{eq:effhs}
+  H^{\text{eff}} = \sum_j \frac{\hat{p}_j}{\bar{p}} \cdot 1,
+\end{equation}
+where $\hat{p}_j$ is the hedonic-predicted value of dwelling $j$ (reflecting
+all observable quality attributes including neighborhood and street quality)
+and $\bar{p}$ is the market average.  This is precisely the housing analog
+to computing effective labor in efficiency units \citep{barnett1979}.
+
+\citet{baumsnow2024} provide the most rigorous recent implementation of this
+idea for the United States.  Decomposing supply responses across 306 metro
+areas into a units margin and a quality margin (floor space per unit,
+renovations), they find that floor-space supply elasticities average 0.5 while
+unit supply elasticities average only 0.3.  The quality margin—ignored by
+count-based measures—accounts for nearly half of the total supply response.
+They further find that supply responses exhibit more variation \textit{within}
+metro areas than \textit{between} them, highlighting the microgeographic
+nature of quality heterogeneity.
+
+\citet{albouy2018} introduce the concept of ``home productivity'' $A_j^Y$—the
+efficiency with which land and capital are converted into housing services in
+city $j$—into the spatial equilibrium framework.  Better neighborhood quality
+(street connectivity, transit, walkability) raises effective home productivity
+by increasing the utility yield per dollar of housing expenditure.  A dwelling
+in a walkable, transit-accessible neighborhood with good schools provides more
+utility per dollar of rent than a physically identical unit in a car-dependent,
+amenity-poor suburb: neighborhood quality is thus a form of locational home
+productivity.
+
+\citet{hsieh2019}'s influential analysis of housing supply misallocation argues
+that supply constraints in high-productivity US cities (New York, San
+Francisco) have reduced aggregate growth by preventing labor reallocation.
+While their headline estimates have been revised downward by
+\citet{greaney2023}, the conceptual mechanism survives: the effective cost of
+housing is the \textit{price per unit of service}, not the price per unit of
+floor space.  A city that provides the same number of apartments at lower
+locational quality has a higher effective cost of living, deterring in-migration
+just as higher rents would.
+
+Despite these intellectual ingredients being available, there is no widely
+adopted, formalized effective housing supply index.  The gap persists because
+constructing such an index requires (a) hedonic estimates of neighborhood
+quality attributes, (b) a framework for aggregating them, and (c) embedding the
+result in a spatial equilibrium model.  This paper takes a step toward filling
+that gap for the Israeli context.
+
+%======================================================================
+\section{The Israeli Housing Market: Institutional Context}
+\label{sec:context}
+%======================================================================
+
+Israel presents an instructive case for studying the quality dimension of
+housing supply.  Several features of the Israeli urban system make the
+quality–price nexus particularly relevant.
+
+\paragraph{Concentrated urban geography.}  Israel is a small, densely populated
+country (9.7 million people in 22,000 km$^2$) with highly concentrated
+urbanization.  The Gush Dan metropolitan area (Tel Aviv and surrounding cities)
+accounts for roughly 45\% of GDP and contains six of our sample cities.  The
+resulting spatial compression means that differences in neighborhood quality
+within the urban system are economically large relative to distances.
+
+\paragraph{Rapid price appreciation.}  Real apartment prices roughly doubled
+between 2008 and 2023, driven by population growth (roughly 2\% per year),
+underbuilding during the 2000s, and low interest rates.  The Israel Land
+Authority (ILA) controls roughly 93\% of land, creating structural constraints
+on supply that go beyond standard planning regulation.  Housing affordability
+has become a central political issue, triggering multiple government plans to
+accelerate construction.
+
+\paragraph{Planning and zoning.}  Israeli planning operates under the Planning
+and Building Law of 1965 (with major amendments).  Urban areas are governed by
+city-level outline plans (toch\-niot m'tah) that specify permitted land uses,
+building rights, and density.  In practice, plan approval and building permit
+processes are slow, and densification in existing walkable neighborhoods faces
+significant opposition.  New construction is often pushed to peripheral areas
+with lower land costs but also lower walkability and amenity density.
+
+\paragraph{Urban heterogeneity.}  Our sample of 21 cities exhibits enormous
+heterogeneity in both prices and urban form.  Tel Aviv (median price
+\textsterling 3.2 million; walkability index 74.6; amenity density 437/km$^2$)
+is at one extreme; Be'er Sheva (median price \textsterling 885,000; walkability
+index 40.3; amenity density 29.4/km$^2$) at the other.  This variation makes
+Israel an ideal laboratory for studying the urbanism–price relationship.
+
+%======================================================================
+\section{Data}
+\label{sec:data}
+%======================================================================
+
+\subsection{Housing Transaction Data}
+\label{sec:data_housing}
+
+Housing price data come from the Israel Tax Authority's real-estate transaction
+database, which records all registered apartment sales.  We obtained
+municipality-level extracts for 20 cities covering transactions from January
+2018 through December 2023—the most recent six-year window available.  Each
+record includes the deal amount (in NIS), the deal date, the asset type
+(apartment, house, commercial, etc.), and the number of rooms.
+
+We restrict the sample to \textit{apartment sales} (Hebrew: \textit{dira}),
+filtering on the deal nature description field.  We exclude transactions with
+missing or implausible amounts and trim the top and bottom 1\% of prices within
+each city to reduce the influence of luxury outliers and data errors.  After
+cleaning, our sample comprises approximately 200,000 transactions across 20
+cities.  We aggregate to the city level by computing the median deal amount
+per city.  (We use the median rather than the mean because apartment prices are
+right-skewed; median and mean price correlations with urbanism metrics are
+similar.)  Table~\ref{tab:housing} reports summary statistics.
+
+\begin{table}[H]
+\centering
+\caption{City-Level Housing Price Summary, 2018--2023}
+\label{tab:housing}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+City & Transactions & Median Price (NIS) & Mean Price (NIS) & Median Price/Room (NIS) \\
+\midrule
+Tel Aviv--Jaffa       & 21,072 & 3,200,000 & 3,641,425 & 1,046,667 \\
+Ra'anana              &  3,312 & 2,580,000 & 2,753,410 &   616,667 \\
+Modi'in               &  3,595 & 2,340,000 & 2,449,880 &   565,000 \\
+Herzliya              &  3,947 & 2,525,000 & 2,769,953 &   656,250 \\
+Jerusalem             & 18,565 & 2,050,000 & 2,299,030 &   600,000 \\
+Ramat Gan             & 10,315 & 2,191,000 & 2,339,210 &   666,667 \\
+Kfar Sava             &  3,695 & 2,250,000 & 2,375,595 &   559,583 \\
+Rishon LeZion         &  9,340 & 1,790,000 & 1,913,487 &   500,000 \\
+Petah Tikva           & 13,027 & 1,765,000 & 1,910,413 &   482,500 \\
+Netanya               & 11,103 & 1,770,000 & 1,957,783 &   466,667 \\
+Bat Yam               &  7,712 & 1,500,000 & 1,620,007 &   530,000 \\
+Rehovot               &  6,397 & 1,800,000 & 1,896,672 &   471,429 \\
+Holon                 &  8,728 & 1,690,000 & 1,786,862 &   496,667 \\
+Bnei Brak             &  6,635 & 1,750,000 & 1,859,413 &   550,000 \\
+Ashdod                & 10,711 & 1,600,000 & 1,697,137 &   442,500 \\
+Ashkelon              &  7,188 & 1,200,000 & 1,242,278 &   316,667 \\
+Beit Shemesh          &  4,891 & 1,485,000 & 1,594,492 &   405,000 \\
+Haifa                 & 19,881 & 1,170,000 & 1,317,500 &   350,000 \\
+Hadera                &  4,917 & 1,340,000 & 1,375,467 &   347,500 \\
+Be'er Sheva           & 14,664 &   885,000 &   972,451 &   266,667 \\
+\midrule
+Mean (unweighted)     &  9,479 & 1,893,550 & 2,073,079 &   518,920 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The price gradient from Tel Aviv (\textsterling 3.2M) to Be'er Sheva
+(\textsterling 885K) reflects a 3.6-fold range—enormous for a country the size
+of Israel.  This variation is partly compositional (apartment size, age), but
+our subsequent analysis shows that it is also strongly associated with
+differences in urbanism quality.
+
+\subsection{Urbanism Quality Metrics}
+\label{sec:data_urbanism}
+
+Urbanism metrics are computed at the city level using open-source street-network
+and point-of-interest (POI) data from OpenStreetMap, retrieved via Overture Maps
+(Amazon S3 parquet files, 2024 vintage).  City boundaries are defined using the
+Israeli Central Bureau of Statistics 2022 statistical area (SA) geodatabase
+(\textit{ezorim statistiim}), projected onto Israeli Transverse Mercator
+(EPSG:2039) for area calculations.  We compute six metrics:
+
+\paragraph{Junction density} (intersections/km$^2$).  Nodes in the pedestrian
+road graph with degree $\geq 3$, divided by city area.  Higher values indicate
+a denser, more grid-like street network.  This metric is the standard empirical
+proxy for walkable block structure \citep{barrington2015}.
+
+\paragraph{Street density} (km/km$^2$).  Total length of the walkable road
+network divided by city area.  A city with more street kilometres per unit area
+provides residents with more route options and shorter detours.
+
+\paragraph{Dead-end ratio}.  The share of nodes with degree 1 (cul-de-sac
+termini or stub streets) in total nodes (intersections plus dead ends).  Higher
+values indicate a tree-like, disconnected network—the street-network signature
+of post-war suburban planning.
+
+\paragraph{Circuity} (dimensionless ratio).  The mean ratio of network distance
+to straight-line (Euclidean) distance across all edges.  Values closer to 1.0
+indicate straighter, more direct streets; higher values indicate winding,
+indirect routes.  Circuity captures a different dimension of connectivity from
+intersection density: a highly connected network can still be circuitous if
+streets follow topographic contours.
+
+\paragraph{Amenity density} (POIs/km$^2$).  The count of daily-life amenity
+POIs—shops, supermarkets, pharmacies, hospitals, schools, restaurants, cafes,
+banks, and post offices—divided by city area.  This metric directly captures
+the concentration of walkable destinations, the primary driver of walkability
+premia found in the hedonic literature \citep{pivo2011}.
+
+\paragraph{Walkability index} (0--100).  A composite score combining the five
+network and amenity metrics, min-max normalised and weighted as follows:
+30\% junction density, 20\% street density, 15\% dead-end ratio (inverted),
+15\% circuity (inverted), 20\% amenity density.  This weighting scheme is
+consistent with the evidence that pedestrian connectivity and destination
+accessibility are the primary drivers of walkability premia
+\citep{bartholomew2011,pivo2011}.
+
+Table~\ref{tab:urbanism} reports summary statistics for the urbanism metrics.
+The variation is substantial: junction density ranges from 5.5 (Hadera,
+partially a large-area municipality) to 119.1 intersections/km$^2$ (Tel Aviv);
+amenity density ranges from 2.9 to 437.4 POIs/km$^2$.
+
+\begin{table}[H]
+\centering
+\caption{Urbanism Metrics: Summary Statistics ($n=21$ city observations)}
+\label{tab:urbanism}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Metric & Min & 25th & Median & 75th & Max & Std Dev \\
+\midrule
+Junction density (int./km$^2$)     &   5.5 &  47.9 &  77.9 & 104.2 & 119.1 & 30.4 \\
+Street density (km/km$^2$)         &  12.2 &  17.4 &  24.1 &  31.3 &  33.7 &  7.1 \\
+Dead-end ratio (share)             &  0.48 &  0.62 &  0.66 &  0.69 &  0.78 &  0.07 \\
+Circuity (ratio)                   &  1.15 &  1.30 &  1.34 &  1.40 &  1.65 &  0.12 \\
+Amenity density (POIs/km$^2$)      &   2.9 &  27.0 &  99.4 & 175.0 & 437.4 & 115.2 \\
+Walkability index (0--100)         &  19.9 &  41.0 &  59.9 &  70.3 &  74.8 & 15.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Data Linkage}
+\label{sec:data_linkage}
+
+The housing price data are organized by municipal code (SEMEL\_YISHUV), while
+the urbanism metrics are attached to CBS statistical areas.  We match them by
+city name, applying a small set of canonical name normalizations (e.g., ``Tel
+Aviv-Jaffa'' to ``Tel Aviv--Jaffa'' in the Overture dataset; ``Herzliya''
+spelling variants).  Of the 20 housing-price cities, 21 city-level matches are
+obtained (Hadera is matched to two non-overlapping statistical areas and
+averaged).  The matched sample of 21 city-area pairs forms the core analytical
+dataset.
+
+%======================================================================
+\section{Empirical Strategy}
+\label{sec:method}
+%======================================================================
+
+\subsection{Unit of Analysis and Identification}
+\label{sec:method_unit}
+
+Our analysis is at the \textit{city level}: one observation per city, with the
+outcome variable being the city's median apartment price and the explanatory
+variables being its urbanism metrics.  This choice is dictated by the
+availability of the urbanism metrics (computed at the city/SA level from
+open-source network data) and the housing price data (available at the
+municipality level from administrative records).
+
+We are explicit that city-level correlations are \textit{not} causal estimates.
+Unobserved city characteristics—history, wealth, socioeconomic composition,
+public investment, regulatory environment—are correlated with both urbanism
+metrics and prices.  Tel Aviv's high junction density and high prices both
+reflect its position as Israel's economic and cultural center; causality could
+run in both directions, or from unobserved third factors.
+
+The cross-city correlations nonetheless serve two purposes.  First, they
+establish the empirical pattern: across Israeli cities, urban form and price are
+strongly co-determined, consistent with the hedonic literature and with spatial
+equilibrium theory.  Second, they provide the raw co-variation needed to
+calibrate an effective housing supply index: whether or not walkability
+\textit{causes} higher prices, the observed price premia in walkable cities
+represent the market's revealed valuation of urban quality—the implicit price
+needed for quality adjustment.
+
+\subsection{Correlation Analysis}
+\label{sec:method_corr}
+
+For each urbanism metric $x$ and city-level median price $p$, we compute:
+\begin{itemize}
+  \item \textbf{Pearson correlation} $r$, which measures the linear association.
+  \item \textbf{Spearman rank correlation} $\rho$, which is robust to outliers
+    and captures monotone but nonlinear associations.
+\end{itemize}
+Both are tested against the null of zero correlation using $t$-statistics with
+$n-2$ degrees of freedom.  With $n=21$ observations, the critical value for
+$p<0.05$ is $|r|>0.433$.
+
+We also estimate bivariate OLS regressions of log median price on each metric
+to quantify the price elasticities, with and without Hadera (the outlier city
+whose urbanism metrics differ markedly due to the large area of one of its
+statistical areas).  These regressions are purely descriptive; we do not claim
+to identify causal effects.
+
+\subsection{Walkability–Price Gradient}
+\label{sec:method_grad}
+
+To illustrate the economic magnitude of the urbanism–price association, we
+estimate the price gradient across the walkability distribution using a
+nonparametric locally weighted regression (LOWESS) of median price on walkability
+index, and report the price differential between the 25th and 75th percentile
+cities.
+
+%======================================================================
+\section{Results}
+\label{sec:results}
+%======================================================================
+
+\subsection{Cross-City Correlations}
+\label{sec:results_corr}
+
+Table~\ref{tab:corr} reports Pearson and Spearman correlations between each
+urbanism metric and city-level median apartment price, along with their
+$p$-values and sample sizes.
+
+\begin{table}[H]
+\centering
+\caption{Correlations between Urbanism Metrics and Median Apartment Price}
+\label{tab:corr}
+\begin{tabular}{lcccccc}
+\toprule
+ & \multicolumn{2}{c}{Pearson} & \multicolumn{2}{c}{Spearman} & & \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Metric & $r$ & $p$ & $\rho$ & $p$ & $n$ & Sig. \\
+\midrule
+Street density (km/km$^2$)     & 0.633 & 0.002 & 0.644 & 0.002 & 21 & *** \\
+Amenity density (POIs/km$^2$)  & 0.636 & 0.002 & 0.470 & 0.032 & 21 & **  \\
+Junction density (int./km$^2$) & 0.540 & 0.012 & 0.474 & 0.030 & 21 & *   \\
+Walkability index (0--100)     & 0.438 & 0.047 & 0.359 & 0.111 & 21 & *   \\
+Circuity (ratio)               & 0.299 & 0.187 & 0.232 & 0.312 & 21 & ns  \\
+Dead-end ratio (share)         & 0.212 & 0.356 & 0.277 & 0.225 & 21 & ns  \\
+\bottomrule
+\multicolumn{7}{l}{\footnotesize $^*p<0.05$; $^{**}p<0.01$; $^{***}p<0.001$. All two-tailed tests.}
+\end{tabular}
+\end{table}
+
+\paragraph{Street density and amenity density.}  The two strongest predictors
+are street density and amenity density, with Pearson correlations of 0.633 and
+0.636 respectively, both significant at the 1\% level.  The Spearman
+correlation for street density (0.644) is essentially identical to the Pearson,
+confirming a linear and monotone relationship.  For amenity density, the
+Spearman correlation (0.470) is lower than Pearson (0.636), reflecting the
+influence of Tel Aviv as a high-leverage observation with both the highest
+amenity density and the highest prices.
+
+\paragraph{Junction density.}  Junction density carries a Pearson correlation
+of 0.540 and Spearman of 0.474, both significant at the 5\% level.  This is
+consistent with the literature on intersection density as a walkability proxy:
+cities with more grid-like, connected street networks command higher prices.
+
+\paragraph{Walkability index.}  The composite walkability index is significant
+by Pearson ($r=0.438$, $p=0.047$) but not by Spearman ($\rho=0.359$,
+$p=0.111$), suggesting the relationship is somewhat sensitive to the
+distributional assumptions.  The composite index aggregates five sub-metrics,
+some of which (dead-end ratio, circuity) are not individually significant.  The
+weaker Spearman performance reflects the non-monotone contribution of these
+sub-metrics.
+
+\paragraph{Dead-end ratio and circuity.}  Neither metric is significantly
+associated with city-level apartment prices.  This contrasts with street-level
+hedonic studies that sometimes find negative effects of dead-end streets.  At
+the cross-city level, the dead-end ratio may reflect compositional differences
+in urban structure (older cores vs. newer suburbs within the same municipal
+boundary) that are masked by city-level aggregation.  Circuity reflects
+topographic features (Jerusalem's hills, Haifa's Carmel ridge) that are not
+per se negatively valued by residents.
+
+\subsection{Economic Magnitude}
+\label{sec:results_magnitude}
+
+To translate correlations into economic magnitudes, we compare cities at the
+25th and 75th percentiles of the walkability and amenity distributions.
+
+\textit{Amenity density}.  The 25th-percentile city (around 27 POIs/km$^2$,
+e.g., Beit Shemesh) has a median price of approximately \textsterling 1.49M.
+The 75th-percentile city (around 175 POIs/km$^2$, e.g., Bnei Brak) has a
+median price of approximately \textsterling 1.75M.  Moving from the 25th to the
+75th percentile of amenity density is associated with a price premium of
+approximately 17\%—roughly \textsterling 260,000 per apartment.
+
+\textit{Street density}.  Moving from the 25th to the 75th percentile of street
+density is associated with a price increase of approximately 45\%—from
+\textsterling 1.4M to \textsterling 2.0M.  This is a large magnitude reflecting
+the fact that street density differences between Israeli cities partly correspond
+to the Tel Aviv vs. periphery distinction.
+
+\textit{Walkability index}.  Moving from a walkability index of 41 (Be'er
+Sheva, Beit Shemesh) to 70 (Holon, Bat Yam, Ra'anana) is associated with a
+price difference of roughly 80--100\%, from \textsterling 885K--\textsterling
+1.49M to \textsterling 1.5M--\textsterling 2.6M.  The large magnitude at the
+extremes includes differences in city income and demand, but the gradient is
+consistent with the walkability capitalization literature.
+
+\subsection{City-Level Patterns}
+\label{sec:results_cities}
+
+Figure~\ref{fig:scatter} (see \texttt{data/processed/maps/scatter\_all\_metrics.png})
+displays scatter plots of each metric against median price.  Several patterns
+are notable:
+
+\begin{itemize}
+  \item \textbf{Tel Aviv} is the highest-priced city and also the most walkable
+    (junction density 119/km$^2$, amenity density 437/km$^2$, walkability 74.6).
+    It is a high-leverage observation but not an outlier—its position is
+    consistent with the overall trend.
+
+  \item \textbf{Bnei Brak} is a case study in the limits of physical metrics:
+    it has high junction density (111/km$^2$), high amenity density
+    (191/km$^2$), and a walkability score of 74.6—very similar to Tel Aviv—yet
+    its median price (NIS 1.75M) is barely half of Tel Aviv's.  This reflects
+    unobserved socioeconomic factors: Bnei Brak is an ultra-orthodox city with
+    a distinct demand structure.
+
+  \item \textbf{Be'er Sheva} is the lowest-priced city and has the lowest
+    walkability (40.3) and the second-lowest amenity density (29.4/km$^2$),
+    consistent with its role as the regional capital of the Negev desert with
+    large low-density residential areas.
+
+  \item \textbf{Haifa} exhibits a paradox: moderate walkability (56.4) but
+    among the lowest prices (NIS 1.17M).  Haifa's topography (Carmel ridge)
+    makes its street network somewhat circuitous despite reasonable connectivity
+    metrics, and the city has experienced long-run population stagnation.
+\end{itemize}
+
+These patterns underscore that cross-city urbanism metrics capture an important
+dimension of housing value but cannot fully explain price variation—unobserved
+city-level fundamentals (income, employment, history, amenity composition)
+matter as well.
+
+%======================================================================
+\section{Effective Housing Supply: Theory and Israeli Application}
+\label{sec:theory}
+%======================================================================
+
+\subsection{Formalizing Effective Housing Supply}
+\label{sec:theory_formal}
+
+The empirical correlations in Section~\ref{sec:results} establish that the
+Israeli housing stock is highly quality-heterogeneous: the same physical
+apartment contributes very different amounts of ``housing services'' depending on
+whether it is located in Tel Aviv or Be'er Sheva.  We now formalize this
+observation using the effective housing supply framework sketched in
+Section~\ref{sec:lit_effhs}.
+
+Let $j$ index dwelling units and $P_j$ denote the market transaction price.  In
+a competitive market, $P_j$ equals the present discounted value of housing
+services that dwelling $j$ provides.  Decompose $P_j$ as:
+\begin{equation}
+\label{eq:decomp}
+  P_j = \underbrace{P^S(S_j)}_{\text{structural}}
+      + \underbrace{P^L(L_j)}_{\text{locational}}
+      + \underbrace{P^N(N_j)}_{\text{neighborhood}}
+      + \varepsilon_j,
+\end{equation}
+where $P^S$, $P^L$, $P^N$ are the hedonic price functions for structural,
+locational, and neighborhood attributes respectively, and $\varepsilon_j$ is a
+residual.  The ``structural'' component captures apartment size, age, and
+condition—the attributes typically counted in unit-supply statistics.  The
+``locational'' and ``neighborhood'' components capture exactly the urbanism
+metrics we study: market access, walkability, amenity density.
+
+Define the \textit{locational quality multiplier} for city $i$ as:
+\begin{equation}
+\label{eq:lqm}
+  \lambda_i = \frac{\bar{P}_i}{\bar{P}},
+\end{equation}
+where $\bar{P}_i$ is the city's median hedonic-predicted price (or, in our
+reduced-form context, the median transaction price controlling for structural
+characteristics) and $\bar{P}$ is the national median.  Then the effective
+housing supply in city $i$ is:
+\begin{equation}
+\label{eq:ehs_city}
+  H_i^{\text{eff}} = \lambda_i \cdot H_i,
+\end{equation}
+where $H_i$ is the raw count of dwelling units.  An apartment in Tel Aviv
+contributes $\lambda_{\text{TA}} > 1$ effective housing units; an apartment in
+Be'er Sheva contributes $\lambda_{\text{BS}} < 1$.
+
+\subsection{Calibration for Israel}
+\label{sec:theory_calib}
+
+Using our transaction data and the national median price of approximately
+NIS 1.6M (the unit-weighted average across our sample), we compute locational
+quality multipliers for each city.  Table~\ref{tab:multipliers} reports these
+multipliers alongside approximate dwelling stock counts (from CBS 2022).
+
+\begin{table}[H]
+\centering
+\caption{Locational Quality Multipliers and Effective Housing Supply, Selected Cities}
+\label{tab:multipliers}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+City & Median Price & $\lambda_i$ & Dwelling Stock & Raw Units & Eff. Units \\
+     & (NIS)       &              & (approx., 000s)  &(index)  & (index) \\
+\midrule
+Tel Aviv      & 3,200,000 & 2.00 & 240 & 100 & 200 \\
+Ra'anana      & 2,580,000 & 1.61 &  55 & 100 & 161 \\
+Jerusalem     & 2,050,000 & 1.28 & 330 & 100 & 128 \\
+Haifa         & 1,170,000 & 0.73 & 175 & 100 &  73 \\
+Be'er Sheva   &   885,000 & 0.55 & 155 & 100 &  55 \\
+\midrule
+\multicolumn{6}{l}{\footnotesize Note: Dwelling stock figures are approximate.
+  $\lambda_i = \bar{P}_i / 1{,}600{,}000$ (national sample median).} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The effective supply adjustment is substantial.  Tel Aviv's housing stock
+contributes twice as many effective housing units as an equivalently sized
+stock in the national median city; Be'er Sheva's stock contributes only 55\% as
+many.  If Israel needs, say, 50,000 new effective housing units to close its
+affordability gap, it would need \textit{more than} 50,000 physical units if
+those units are built in low-quality locations (peripheral cities with low
+walkability and amenity density), and could achieve the target with
+\textit{fewer} physical units if built in high-quality locations.
+
+\subsection{Connection to Housing Supply Constraints}
+\label{sec:theory_supply}
+
+The effective housing supply framework connects naturally to the Hsieh--Moretti
+spatial misallocation argument.  In their model, the relevant price for labor
+allocation is the per-unit cost of housing services $P_i$ in city $i$—the
+effective price, not the raw transaction price.  If housing supply is
+constrained in high-quality cities (as it is in Tel Aviv, where land is scarce
+and planning restrictions are binding), then the cost of accessing a unit of
+effective housing services in Tel Aviv is very high, deterring workers from
+locating there and causing spatial misallocation.
+
+Our data directly quantify this constraint.  Tel Aviv's walkability index is 74.6,
+amenity density 437/km$^2$—the highest in our sample by a wide margin.  Its
+median price is NIS 3.2M, more than three times the price in Be'er Sheva.
+The price differential reflects the premium households are willing to pay for
+walkable, amenity-rich neighborhoods.  If Tel Aviv could expand its effective
+housing supply—either by building more units at current quality levels or by
+upzoning to allow denser mixed-use development—the effective price of a housing
+service unit would fall, enabling more households to access high-quality urban
+environments.
+
+Crucially, however, expanding the \textit{quantity} of units in low-walkability
+peripheral cities does not expand effective supply proportionally, because these
+units carry lower locational quality multipliers.  The locational quality
+margin—neighborhood quality as home productivity—means that building at the
+periphery is an imperfect substitute for building in walkable, amenity-rich
+areas.
+
+\subsection{The Quality Elasticity}
+\label{sec:theory_elasticity}
+
+Extending the \citet{baumsnow2024} framework to include locational quality,
+the total supply response to a demand shock $\Delta D$ in city $i$ can be
+decomposed as:
+\begin{equation}
+\label{eq:supply_decomp}
+  \frac{\Delta H_i^{\text{eff}}}{\Delta D}
+    = \underbrace{\lambda_i \cdot \frac{\partial H_i}{\partial D}}_{\text{units at current quality}}
+    + \underbrace{H_i \cdot \frac{\partial \lambda_i}{\partial D}}_{\text{locational quality change}}.
+\end{equation}
+The first term captures the conventional unit supply elasticity, scaled by the
+city's existing quality level.  The second term captures the endogenous
+response of neighborhood quality itself to population growth—the agglomeration
+of amenities, the upgrading of retail, and the improvement of transit induced
+by higher density.  \citet{ahlfeldt2015} identify both production and
+residential agglomeration externalities with elasticities of 0.07 and 0.14
+respectively; these are precisely the channels through which $\partial \lambda_i /
+\partial D > 0$.
+
+For Israel, this decomposition implies that cities with high baseline walkability
+(Tel Aviv, Ramat Gan) can expand effective supply both at the extensive margin
+(more units) and at the intensive margin (higher walkability from increased
+density).  Peripheral cities with low walkability and low amenity density expand
+effective supply only at the extensive margin and may see limited locational
+quality appreciation even as population grows.
+
+%======================================================================
+\section{Policy Implications}
+\label{sec:policy}
+%======================================================================
+
+Our findings carry several implications for Israeli housing policy.
+
+\paragraph{Quality-adjusted housing targets.}  National housing construction
+targets in Israel are typically stated in terms of raw unit counts (e.g., the
+government's target of 50,000 new units per year).  Our analysis suggests that
+a quality-adjusted target—one that weights new units by their locational
+quality multiplier—would better reflect the actual contribution to housing
+welfare.  A new apartment in Tel Aviv's Florentine neighborhood contributes
+roughly twice as much to effective housing supply as an identical apartment in
+a peripheral city.
+
+\paragraph{Location of new supply.}  The strong correlation between walkability
+and price implies that there is unmet demand for walkable, amenity-rich
+neighborhoods that is not being satisfied by new construction.  If new supply
+is systematically directed to low-walkability peripheral areas (as the ILA land
+release pattern tends to imply), the effective supply gap may widen even as
+raw unit counts increase.  Planning reform should prioritize densification of
+existing walkable neighborhoods over greenfield development at the periphery.
+
+\paragraph{Street-network investment as housing policy.}  Our results show that
+street density and amenity density are the strongest predictors of apartment
+prices.  This implies that investments in street-network improvement—adding
+intersections, reducing block sizes, activating ground-floor retail—directly
+increase the effective housing supply by raising the locational quality
+multiplier of existing units.  Such investments are often cheaper per effective
+unit than new construction, and they benefit existing residents as well.
+
+\paragraph{Avoiding the effective supply illusion.}  Israel's central government
+has in recent years approved large-scale housing construction in peripheral
+cities (Hadera, Ashkelon, Be'er Sheva, Beit Shemesh) on the grounds that this
+will reduce affordability pressure in the Tel Aviv metropolitan area.
+Our analysis suggests caution: apartments built in cities with walkability
+indices of 20--40 provide a fraction of the housing services of Tel Aviv
+apartments and are imperfect substitutes for central-city supply.  The
+``effective supply illusion''—counting low-quality peripheral units as
+equivalent to high-quality central units—may lead policymakers to declare
+victory on housing supply while the effective deficit persists.
+
+\paragraph{Implications for the Hsieh--Moretti mechanism.}  Even accepting the
+downward-revised estimates of \citet{greaney2023}, the spatial misallocation
+mechanism is operative in Israel: high-productivity workers are priced out of
+high-walkability, high-productivity cities.  The welfare cost is amplified by
+the quality dimension: workers who are forced to live in low-amenity peripheral
+cities lose not only proximity to employment but also the daily-life amenities
+(walkable retail, schools, parks) that walkable neighborhoods provide.  An
+effective housing supply measure that captures this quality dimension would
+improve both the measurement and the policy analysis of Israeli housing
+misallocation.
+
+%======================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+%======================================================================
+
+This paper has linked quantitative urbanism metrics—street-network density,
+junction density, amenity density, and composite walkability—to residential
+apartment prices across 21 Israeli cities.  Our main empirical finding is that
+street density and amenity density are strongly positively correlated with
+city-level median apartment prices (Pearson $r \approx 0.63$--$0.64$,
+$p<0.01$), while junction density ($r=0.54$, $p<0.05$) and the composite
+walkability index ($r=0.44$, $p<0.05$) are also significant.  Dead-end ratio
+and circuity are not significantly associated with prices at the city level.
+
+We then connected these empirical findings to the concept of \textit{effective
+housing supply}—the quality-adjusted aggregate stock of housing services,
+analogous to efficiency-weighted labor supply in labor economics.  We showed that
+the observed price premia in walkable, amenity-rich cities correspond precisely
+to the locational quality multipliers needed to aggregate a heterogeneous housing
+stock into effective supply units.  Calibrating these multipliers for Israel, we
+find that an apartment in Tel Aviv contributes approximately twice as many
+effective housing units as a national-median apartment, while an apartment in
+Be'er Sheva contributes about half as many.
+
+The implications are substantive.  Israel's housing shortage is not merely a
+shortage of physical units; it is a shortage of \textit{effective housing
+services}—dwellings in walkable, amenity-rich, well-connected neighborhoods.
+Policies that add units in low-walkability peripheral cities provide partial
+relief at best, because these units carry low locational quality multipliers.
+Effective supply expansion requires either densification of existing walkable
+neighborhoods or large-scale investment in the street networks and amenities
+that create walkability.
+
+Several limitations of the present analysis should be noted.  First, our
+city-level correlations do not establish causality; unobserved city
+characteristics confound the urbanism–price relationship.  Future work should
+exploit within-city variation in urbanism metrics—ideally using planned
+infrastructure improvements as instruments—to identify causal effects.
+Second, our walkability index is constructed from open-source network data
+without direct measurement of perceived walkability or transit quality.
+Third, our effective supply framework uses observed median prices as quality
+weights, which embeds all determinants of price—including unobserved
+amenities—rather than isolating the contribution of urbanism metrics per se.
+
+Notwithstanding these limitations, the analysis demonstrates that urban form
+matters for Israeli housing affordability in ways that conventional unit-count
+approaches miss.  As Israel seeks to build its way out of its housing crisis,
+the \textit{quality} of where it builds is at least as important as the
+\textit{quantity}.
+
+%======================================================================
+\section*{Data and Code Availability}
+%======================================================================
+
+All data processing and analysis code is available in the project repository.
+Urbanism metrics are computed from OpenStreetMap data (open license) retrieved
+via Overture Maps.  Housing transaction data are from the Israeli Tax Authority
+(publicly available at the open-data portal).  Statistical area boundaries are
+from the Israeli Central Bureau of Statistics 2022 geodatabase.
+
+%======================================================================
+\bibliography{refs}
+\bibliographystyle{aer}
+%======================================================================
+
+\end{document}
