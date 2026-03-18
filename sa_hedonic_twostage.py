@@ -44,14 +44,14 @@ MIN_TXN_PER_BLOCK = 5      # minimum transactions to keep a gush block
 REF_YEAR          = 2018   # reference year for year FEs
 
 CITY_CODE_MAP = {
-    "100779": "Tel Aviv-Yafo",
+    "100779": "Tel Aviv-Jaffa",
     "65700":  "Jerusalem",
     "62630":  "Haifa",
     "40747":  "Rishon LeZion",
     "49499":  "Petah Tikva",
     "34119":  "Ashdod",
     "45470":  "Netanya",
-    "42076":  "Beer Sheva",
+    "42076":  "Be'er Sheva",
     "24123":  "Bnei Brak",
     "36351":  "Holon",
     "39093":  "Ramat Gan",
@@ -60,10 +60,10 @@ CITY_CODE_MAP = {
     "22775":  "Ashkelon",
     "23894":  "Rehovot",
     "18384":  "Herzliya",
-    "17081":  "Kfar Saba",
+    "17081":  "Kfar Sava",
     "14519":  "Modi'in",
     "15040":  "Ra'anana",
-    "13148":  "Bet Shemesh",
+    "13148":  "Beit Shemesh",
 }
 
 URBANISM_METRICS = [
@@ -218,28 +218,46 @@ def stars(p):
 
 # ── Stage 1: load transactions ────────────────────────────────────────────────
 
-def load_transactions():
-    """Load all XLSX files; return cleaned transaction-level DataFrame."""
-    print("Stage 1 – loading transactions …")
-    dfs = []
-    for f in sorted(glob.glob("/home/user/housing/*.xlsx")):
-        city_code = os.path.basename(f).split("-")[0]
-        city_en   = CITY_CODE_MAP.get(city_code, city_code)
-        try:
-            df = pd.read_excel(
-                f,
-                usecols=["DEALAMOUNT", "POLYGON_ID", "DEALDATE",
-                         "ASSETROOMNUM", "BUILDINGYEAR", "BUILDINGFLOORS",
-                         "FLOORNO", "NEWPROJECTTEXT"],
-            )
-            df["city_en"]   = city_en
-            df["city_code"] = city_code
-            dfs.append(df)
-        except Exception as e:
-            print(f"  warning {os.path.basename(f)}: {e}")
+_RAW_CACHE = f"{PROCESSED_DIR}/transactions_raw.parquet"
 
-    df = pd.concat(dfs, ignore_index=True)
-    print(f"  raw rows: {len(df):,}")
+def load_transactions():
+    """Load all XLSX files; return cleaned transaction-level DataFrame.
+
+    On first run, all XLSX files are parsed and the raw data is written to
+    a parquet cache so that subsequent runs skip the slow Excel reading.
+    """
+    print("Stage 1 – loading transactions …")
+
+    if os.path.exists(_RAW_CACHE):
+        print(f"  reading from cache: {_RAW_CACHE}")
+        df = pd.read_parquet(_RAW_CACHE)
+        # always re-apply the map so name fixes take effect without rebuilding
+        df["city_en"] = df["city_code"].astype(str).map(CITY_CODE_MAP).fillna(df["city_code"])
+        print(f"  raw rows: {len(df):,}")
+    else:
+        dfs = []
+        xlsx_files = sorted(glob.glob("/home/user/housing/*.xlsx"))
+        for i, f in enumerate(xlsx_files, 1):
+            city_code = os.path.basename(f).split("-")[0]
+            city_en   = CITY_CODE_MAP.get(city_code, city_code)
+            try:
+                print(f"  [{i}/{len(xlsx_files)}] {os.path.basename(f)} …", end="\r")
+                tmp = pd.read_excel(
+                    f,
+                    usecols=["DEALAMOUNT", "POLYGON_ID", "DEALDATE",
+                             "ASSETROOMNUM", "BUILDINGYEAR", "BUILDINGFLOORS",
+                             "FLOORNO", "NEWPROJECTTEXT"],
+                )
+                tmp["city_en"]   = city_en
+                tmp["city_code"] = city_code
+                dfs.append(tmp)
+            except Exception as e:
+                print(f"\n  warning {os.path.basename(f)}: {e}")
+
+        df = pd.concat(dfs, ignore_index=True)
+        print(f"\n  raw rows: {len(df):,}")
+        df.to_parquet(_RAW_CACHE, index=False)
+        print(f"  cache written → {_RAW_CACHE}")
 
     # ── parse price ──────────────────────────────────────────────────────────
     df["DEALAMOUNT"] = (
