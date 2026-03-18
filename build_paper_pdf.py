@@ -1031,36 +1031,36 @@ def build_story():
         coefs = {}; var_names = []; n_txn = 124020; n_block = 11504; r2_w = 0.132
 
     STAGE1_LABELS = {
-        "log(rooms)":          "log(rooms)",
-        "building_age":        "Building age (years)",
-        "building_age²/1000":  "Building age² / 1000",
-        "log(bldg_floors)":    "log(floors in building)",
-        "floor_num":           "Apartment floor number",
-        "floor_pos":           "Floor position (floor/total floors)",
-        "is_new_project":      "New-project indicator",
-        "is_penthouse":        "Penthouse indicator",
-        "year=2019":  "Year = 2019",
-        "year=2020":  "Year = 2020",
-        "year=2021":  "Year = 2021",
-        "year=2022":  "Year = 2022",
-        "year=2023":  "Year = 2023",
+        "log_rooms":         "log(rooms)",
+        "building_age":      "Building age (years)",
+        "building_age_sq":   "Building age² / 1,000",
+        "log_bldg_floors":   "log(floors in building)",
+        "floor_num_imp":     "Apartment floor number",
+        "floor_pos_imp":     "Floor position (floor / total floors)",
+        "is_new_project":    "New-project indicator",
+        "is_penthouse":      "Penthouse indicator",
+        "yr_2019": "Year = 2019",
+        "yr_2020": "Year = 2020",
+        "yr_2021": "Year = 2021",
+        "yr_2022": "Year = 2022",
+        "yr_2023": "Year = 2023",
     }
 
     t_s1_data = [["Variable", "Coefficient", "Interpretation"]]
     INTERP = {
-        "log(rooms)":          "size premium per doubling of rooms",
-        "building_age":        "linear depreciation per year",
-        "building_age²/1000":  "nonlinear depreciation curvature",
-        "log(bldg_floors)":    "building height/type premium",
-        "floor_num":           "premium per floor (views, noise)",
-        "floor_pos":           "relative floor position effect",
-        "is_new_project":      "new-development premium",
-        "is_penthouse":        "penthouse premium",
-        "year=2019":  "price change 2018→2019",
-        "year=2020":  "price change 2018→2020",
-        "year=2021":  "price change 2018→2021",
-        "year=2022":  "price change 2018→2022",
-        "year=2023":  "price change 2018→2023",
+        "log_rooms":        "size premium per doubling of rooms",
+        "building_age":     "linear depreciation per year",
+        "building_age_sq":  "nonlinear depreciation curvature",
+        "log_bldg_floors":  "building height/type premium",
+        "floor_num_imp":    "premium per floor (views, noise)",
+        "floor_pos_imp":    "relative floor position effect",
+        "is_new_project":   "new-development premium",
+        "is_penthouse":     "penthouse premium",
+        "yr_2019": "price change 2018→2019",
+        "yr_2020": "price change 2018→2020",
+        "yr_2021": "price change 2018→2021",
+        "yr_2022": "price change 2018→2022",
+        "yr_2023": "price change 2018→2023",
     }
     for v in var_names:
         lbl = STAGE1_LABELS.get(v, v)
@@ -1080,14 +1080,30 @@ def build_story():
         S["TableNote"]))
     sp()
 
-    p("The Stage 1 results confirm that house characteristics are significant price "
-      "determinants. The log(rooms) coefficient of 0.534 implies that each doubling of "
-      "room count raises price by 53%. Building age exhibits the expected negative "
-      "curvature: new construction commands a premium, with depreciation accelerating "
-      "after approximately 30–40 years. The year fixed effects document the sharp "
-      "Israeli housing price appreciation: prices rose 11 log points in 2021 and "
-      "28–33 log points cumulatively by 2022–2023—consistent with the macro evidence "
-      "of a significant housing boom during this period.")
+    # dynamic values from JSON
+    _c = coefs  # dict: var_name → float
+    _rooms_pct   = int(round((2 ** _c.get("log_rooms", 0.517) - 1) * 100))
+    _yr21        = _c.get("yr_2021", 0.106)
+    _yr22        = _c.get("yr_2022", 0.229)
+    _yr23        = _c.get("yr_2023", 0.282)
+    _floor_pct   = _c.get("floor_num_imp", 0.013) * 100
+    _pent_pct    = _c.get("is_penthouse", 0.060) * 100
+    _bldg_coef   = _c.get("log_bldg_floors", -0.045)
+
+    p(f"The Stage 1 results confirm that house characteristics are significant price "
+      f"determinants. The log(rooms) coefficient of {_c.get('log_rooms', 0.517):.3f} "
+      f"implies that each doubling of room count raises price by {_rooms_pct}%. "
+      f"Building age exhibits the expected negative curvature: new construction "
+      f"commands a premium, with depreciation accelerating at older vintages. "
+      f"The log(building floors) coefficient of {_bldg_coef:+.3f} indicates that "
+      f"apartments in taller buildings trade at a slight discount per unit, consistent "
+      f"with supply effects in high-rise buildings. Each additional floor in apartment "
+      f"position adds {_floor_pct:.1f}% to price; penthouses command a "
+      f"{_pent_pct:.0f}% premium. "
+      f"The year fixed effects document the sharp Israeli housing price appreciation: "
+      f"prices rose {_yr21*100:.0f} log points in 2021, reaching "
+      f"{_yr22*100:.0f} and {_yr23*100:.0f} log points cumulatively "
+      f"by 2022–2023—consistent with the macro evidence of a significant housing boom.")
 
     # Figures: FE by city + year FE
     fig_fe_city = os.path.join(MAPS_DIR, "hedonic_fe_by_city.png")
@@ -1165,9 +1181,16 @@ def build_story():
         "<b>Table S2.</b> Stage 2: Gush-Block Location Premiums Regressed on Urbanism Metrics",
         S["H3"]))
     story.append(t_s2)
+    try:
+        _n_gush = next(iter(biv_g.values()), {}).get("n", 8790)
+        _n_city = next(iter(biv_c.values()), {}).get("n", 16)
+        _G      = next(iter(biv_g.values()), {}).get("G", 16)
+    except Exception:
+        _n_gush = 8790; _n_city = 16; _G = 16
     story.append(Paragraph(
-        "Gush-level columns: N = 8,790 gush blocks, cluster-robust SE (cluster = city, 16 clusters). "
-        "City-level columns: N = 16 cities, homoskedastic OLS. "
+        f"Gush-level columns: N = {_n_gush:,} gush blocks, cluster-robust SE "
+        f"(cluster = city, {_G} clusters). "
+        f"City-level columns: N = {_n_city} cities, homoskedastic OLS. "
         "Dependent variable: Stage 1 POLYGON_ID fixed effect α̂ⱼ. "
         "*** p < 0.01; ** p < 0.05; * p < 0.10.",
         S["TableNote"]))
