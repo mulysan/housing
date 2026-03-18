@@ -1,9 +1,14 @@
 """
 Build paper.pdf from the paper content using ReportLab.
 Embeds all figures from data/processed/maps/.
+Math equations are rendered via matplotlib mathtext (LaTeX-style).
 """
 
+import io
 import os
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
@@ -138,6 +143,43 @@ def fig(path, width=14*cm, caption=None):
     if caption:
         items.append(Paragraph(caption, make_styles()["Caption"]))
     return items
+
+
+def render_eq(latex_str, fontsize=13, dpi=220):
+    """
+    Render a LaTeX math string using matplotlib mathtext.
+    Returns a ReportLab Image flowable (from in-memory PNG).
+    The string should be a raw math expression WITHOUT surrounding $…$.
+    """
+    expr = f"${latex_str}$"
+    # measure text size first
+    fig_tmp = plt.figure(figsize=(0.01, 0.01))
+    txt = fig_tmp.text(0, 0, expr, fontsize=fontsize)
+    fig_tmp.canvas.draw()
+    bbox = txt.get_window_extent(renderer=fig_tmp.canvas.get_renderer())
+    plt.close(fig_tmp)
+
+    w_in = max(bbox.width  / dpi + 0.1, 1.0)
+    h_in = max(bbox.height / dpi + 0.06, 0.3)
+
+    fig_eq = plt.figure(figsize=(w_in, h_in))
+    fig_eq.patch.set_alpha(0)
+    fig_eq.text(0.5, 0.5, expr,
+                ha="center", va="center",
+                fontsize=fontsize,
+                transform=fig_eq.transFigure)
+    buf = io.BytesIO()
+    fig_eq.savefig(buf, dpi=dpi, bbox_inches="tight",
+                   transparent=True, format="png")
+    plt.close(fig_eq)
+    buf.seek(0)
+
+    # scale to page width: aim for ~14 cm wide at most
+    pix_w = w_in * dpi
+    target_w = min(14 * cm, pix_w * (cm / (dpi / 2.54)))
+    target_h = h_in * (target_w / w_in) / 2.54 * cm
+    return Image(buf, width=target_w, height=target_h)
+
 
 # ── Content builder ────────────────────────────────────────────────────────
 
@@ -592,27 +634,23 @@ def build_story():
       "Aviv or Be'er Sheva. We now formalize this observation.")
     p("In labor economics, heterogeneous workers are aggregated into effective labor "
       "supply using relative wages as weights (Katz and Murphy, 1992):")
-    story.append(Paragraph(
-        "L_eff  =  Σᵢ (wᵢ / w̄) · Lᵢ",
-        S["Equation"]))
+    story.append(render_eq(
+        r"L_{eff} = \sum_i \frac{w_i}{\bar{w}} \cdot L_i"))
     p("where wᵢ is the wage of worker type i, w̄ is the average wage, and Lᵢ is the count "
       "of type-i workers. The analogous formula for housing is:")
-    story.append(Paragraph(
-        "H_eff  =  Σⱼ (p̂ⱼ / p̄) · 1",
-        S["Equation"]))
+    story.append(render_eq(
+        r"H_{eff} = \sum_j \frac{\hat{p}_j}{\bar{p}}"))
     p("where p̂ⱼ is the hedonic-predicted value of dwelling j (reflecting all observable "
       "quality attributes including neighborhood and street quality) and p̄ is the market "
       "average. This is precisely the housing analog to computing effective labor in "
       "efficiency units (Barnett, 1979).")
     p("Define the <b>locational quality multiplier</b> for city i as:")
-    story.append(Paragraph(
-        "λᵢ  =  P̄ᵢ / P̄",
-        S["Equation"]))
+    story.append(render_eq(
+        r"\lambda_i = \frac{\bar{P}_i}{\bar{P}}"))
     p("where P̄ᵢ is the city's median apartment price and P̄ is the national sample median "
       "(≈ ₪1.6M in our dataset). The effective housing supply in city i is then:")
-    story.append(Paragraph(
-        "H_eff,i  =  λᵢ · Hᵢ",
-        S["Equation"]))
+    story.append(render_eq(
+        r"H_{eff,i} = \lambda_i \cdot H_i"))
     p("where Hᵢ is the raw count of dwelling units. An apartment in Tel Aviv contributes "
       "λ_TA > 1 effective housing units; an apartment in Be'er Sheva contributes λ_BS < 1.")
 
@@ -1005,9 +1043,8 @@ def build_story():
 
     h("Stage 1: Hedonic Regression with Gush-Block Fixed Effects", 3)
     p("In Stage 1 we estimate a transaction-level hedonic regression:")
-    story.append(Paragraph(
-        "log(price_usd)ᵢⱼ  =  αⱼ  +  Xᵢⱼ β  +  γₜ  +  εᵢⱼ",
-        S["Equation"]))
+    story.append(render_eq(
+        r"\log(price_{usd})_{ij} \;=\; \alpha_j \;+\; X_{ij}\,\beta \;+\; \gamma_t \;+\; \varepsilon_{ij}"))
     p("where α<sub>j</sub> is a POLYGON_ID (gush-block) fixed effect, γ<sub>t</sub> are "
       "year fixed effects (1999–2024; reference: 1998), and X<sub>ij</sub> is a vector of "
       "all available apartment and building characteristics: log(rooms), building age, "
@@ -1019,9 +1056,10 @@ def build_story():
       "so that <font name='DejaVuSerif'>α̂</font><sub>j</sub> reflects the pure location "
       "premium—the price a fully standardized apartment commands in gush block j. "
       "Estimation uses the within-group (demeaning) transformation: demean all variables "
-      "by POLYGON_ID, run OLS to obtain <font name='DejaVuSerif'>β̂</font>, then recover "
+      "by POLYGON_ID, run OLS on demeaned data to obtain "
+      "<font name='DejaVuSerif'>β̂</font>, then recover each block fixed effect as "
       "<font name='DejaVuSerif'>α̂</font><sub>j</sub> = "
-      "ȳ<sub>j</sub> − <font name='DejaVuSerif'>β̂</font>′ x̄<sub>j</sub>.")
+      "ȳ<sub>j</sub> − <font name='DejaVuSerif'>β̂</font>′x̄<sub>j</sub>.")
     sp()
 
     # Stage 1 results table
@@ -1158,9 +1196,8 @@ def build_story():
     p("In Stage 2 we regress the estimated gush-block fixed effects "
       "<font name='DejaVuSerif'>α̂</font><sub>j</sub> on city-level "
       "urbanism metrics, with standard errors clustered by city (16 clusters):")
-    story.append(Paragraph(
-        "α̂ⱼ  =  δ₀  +  δ₁ · urbanism_city(j)  +  νⱼ",
-        S["Equation"]))
+    story.append(render_eq(
+        r"\hat{\alpha}_j \;=\; \delta_0 \;+\; \delta_1 \cdot urbanism_{c(j)} \;+\; \nu_j"))
     p("Because all gush blocks within the same city share the same urbanism metrics, "
       "the cluster structure exactly reflects the level of variation in the regressors. "
       "The Stage 2 parameter δ₁ measures the urban-quality premium on the "
