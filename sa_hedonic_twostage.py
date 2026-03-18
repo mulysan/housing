@@ -41,7 +41,7 @@ MAPS_DIR      = "data/processed/maps"
 os.makedirs(MAPS_DIR, exist_ok=True)
 
 MIN_TXN_PER_BLOCK = 5      # minimum transactions to keep a gush block
-REF_YEAR          = 2018   # reference year for year FEs
+REF_YEAR          = 1998   # reference year for year FEs
 
 CITY_CODE_MAP = {
     "100779": "Tel Aviv-Jaffa",
@@ -279,7 +279,7 @@ def load_transactions():
         return np.nan
 
     df["deal_year"] = df["DEALDATE"].apply(parse_year)
-    df = df[df["deal_year"].between(2018, 2023)].copy()
+    df = df[df["deal_year"].between(1998, 2024)].copy()
 
     # ── parse rooms ───────────────────────────────────────────────────────────
     df["rooms"] = pd.to_numeric(df["ASSETROOMNUM"], errors="coerce")
@@ -328,8 +328,8 @@ def load_transactions():
     df["POLYGON_ID"] = df["POLYGON_ID"].astype(str).str.strip()
     df = df[df["POLYGON_ID"].notna() & (df["POLYGON_ID"] != "nan")].copy()
 
-    # ── year dummies (2019–2023; 2018 = reference) ───────────────────────────
-    for yr in range(2019, 2024):
+    # ── year dummies (1999–2024; 1998 = reference) ───────────────────────────
+    for yr in range(1999, 2025):
         df[f"yr_{yr}"] = (df["deal_year"] == yr).astype(float)
 
     print(f"  clean rows:  {len(df):,}")
@@ -351,7 +351,7 @@ def estimate_stage1(df):
     """
     print("\nStage 1 – within-group FE estimation …")
 
-    YEAR_DUMMIES = [f"yr_{y}" for y in range(2019, 2024)]
+    YEAR_DUMMIES = [f"yr_{y}" for y in range(1999, 2025)]
     HOUSE_VARS   = [
         # dwelling characteristics
         "log_rooms",
@@ -593,8 +593,8 @@ def make_figures(merged, city_fe, stage1_info):
     b_w      = np.array(stage1_info["b_w"])
     hv       = stage1_info["house_vars"]
     coef_map = dict(zip(hv, b_w))
-    yr_labels = ["2018 (ref)", "2019", "2020", "2021", "2022", "2023"]
-    yr_coefs  = [0.0] + [coef_map.get(f"yr_{y}", 0.0) for y in range(2019, 2024)]
+    yr_labels = ["1998 (ref)"] + [str(y) for y in range(1999, 2025)]
+    yr_coefs  = [0.0] + [coef_map.get(f"yr_{y}", 0.0) for y in range(1999, 2025)]
     fig, ax = plt.subplots(figsize=(7, 3.5))
     ax.bar(yr_labels, yr_coefs, color="#2C7BB6", alpha=0.8)
     ax.axhline(0, color="k", lw=0.8)

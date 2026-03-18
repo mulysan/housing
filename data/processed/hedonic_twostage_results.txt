@@ -3,44 +3,65 @@ TWO-STAGE HEDONIC REGRESSION – RESULTS SUMMARY
 ======================================================================
 
 STAGE 1: House Characteristics (within-POLYGON_ID estimator)
-  N transactions: 124,020
-  N gush blocks:  11,504
-  Within-R²:      0.1387
+  N transactions: 548,335
+  N gush blocks:  37,997
+  Within-R²:      0.6017
 
   Variable                         Coef
   -------------------------------------
-  log_rooms                     0.51717
-  building_age                 -0.00071
-  building_age_sq              -0.03166
-  log_bldg_floors              -0.04536
-  floor_num_imp                 0.01325
-  floor_pos_imp                -0.03896
-  is_new_project               -0.03028
-  is_penthouse                  0.06003
-  yr_2019                       0.00980
-  yr_2020                       0.03439
-  yr_2021                       0.10609
-  yr_2022                       0.22922
-  yr_2023                       0.28245
+  log_rooms                     0.54852
+  building_age                 -0.00859
+  building_age_sq               0.10938
+  log_bldg_floors              -0.04059
+  floor_num_imp                 0.01501
+  floor_pos_imp                -0.02923
+  is_new_project               -0.00711
+  is_penthouse                  0.05118
+  yr_1999                       0.02721
+  yr_2000                      -0.03174
+  yr_2001                      -0.04476
+  yr_2002                       0.03483
+  yr_2003                       0.00524
+  yr_2004                       0.00481
+  yr_2005                       0.02938
+  yr_2006                       0.05384
+  yr_2007                       0.09126
+  yr_2008                       0.20476
+  yr_2009                       0.35488
+  yr_2010                       0.50529
+  yr_2011                       0.57908
+  yr_2012                       0.61026
+  yr_2013                       0.67545
+  yr_2014                       0.73372
+  yr_2015                       0.81606
+  yr_2016                       0.90504
+  yr_2017                       0.95972
+  yr_2018                       0.97273
+  yr_2019                       0.98236
+  yr_2020                       1.00616
+  yr_2021                       1.07383
+  yr_2022                       1.19455
+  yr_2023                       1.24351
+  yr_2024                       1.30136
 
 ======================================================================
 STAGE 2: FE ~ Urbanism Metrics  (cluster-robust SE, cluster=city)
   Metric                                 Coef        SE       p   Sig      R²
   ------------------------------------------------------------------------
-  Walkability Index (0–100)           0.02341   0.00643   0.002   ***  0.3415
-  Junction Density (int./km²)         0.01177   0.00279   0.000   ***  0.3901
-  Street Density (km/km²)             0.04587   0.01043   0.000   ***  0.4120
-  Amenity Density (POIs/km²)          0.00261   0.00040   0.000   ***  0.4244
-  Dead-End Ratio                      1.11060   1.06178   0.309        0.0157
-  Circuity (ratio)                   -0.25439   0.72883   0.731        0.0029
+  Walkability Index (0–100)           0.02192   0.00645   0.003   ***  0.2748
+  Junction Density (int./km²)         0.01044   0.00215   0.000   ***  0.3273
+  Street Density (km/km²)             0.04384   0.00787   0.000   ***  0.3762
+  Amenity Density (POIs/km²)          0.00200   0.00028   0.000   ***  0.3351
+  Dead-End Ratio                      1.23969   0.90102   0.185        0.0232
+  Circuity (ratio)                   -0.01165   0.54205   0.983        0.0000
 
 ======================================================================
 STAGE 2 (city-level, N=20): FE ~ Urbanism Metrics
   Metric                                 Coef        SE       p      R²
   -----------------------------------------------------------------
-  Walkability Index (0–100)           0.01420   0.00527   0.015  0.2878
-  Junction Density (int./km²)         0.00808   0.00243   0.004  0.3809
-  Street Density (km/km²)             0.03435   0.00842   0.001  0.4802
-  Amenity Density (POIs/km²)          0.00219   0.00053   0.001  0.4902
-  Dead-End Ratio                      1.54037   1.12428   0.188  0.0944
-  Circuity (ratio)                    0.39773   0.56000   0.487  0.0273
+  Walkability Index (0–100)           0.01285   0.00507   0.021  0.2633
+  Junction Density (int./km²)         0.00740   0.00234   0.005  0.3566
+  Street Density (km/km²)             0.03268   0.00792   0.001  0.4861
+  Amenity Density (POIs/km²)          0.00189   0.00054   0.002  0.4079
+  Dead-End Ratio                      1.65714   1.04695   0.131  0.1222
+  Circuity (ratio)                    0.50412   0.52371   0.349  0.0490
