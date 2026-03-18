@@ -586,7 +586,7 @@ def run_stage2(merged):
 
 # ── figures ───────────────────────────────────────────────────────────────────
 
-def make_figures(merged, city_fe, stage1_info):
+def make_figures(merged, city_fe, stage1_info, df_txn=None, fe_df=None):
     print("\nGenerating figures …")
 
     # ── Fig A: Stage 1 year FE plot ──────────────────────────────────────────
@@ -701,6 +701,111 @@ def make_figures(merged, city_fe, stage1_info):
     except Exception as e:
         print(f"  skip comparison figure: {e}")
 
+    # ── Fig E: Quality-adjusted supply index + price index by year ───────────
+    if df_txn is not None and fe_df is not None:
+        try:
+            # Build quality weight per gush block
+            fe_q = fe_df[["POLYGON_ID", "fe"]].copy()
+            med_fe = np.median(fe_q["fe"].values)
+            fe_q["quality_weight"] = np.exp(fe_q["fe"] - med_fe)   # normalised to median=1
+
+            # Merge with transaction-level data (only blocks in fe_df)
+            txn_q = df_txn[["POLYGON_ID", "deal_year"]].merge(
+                fe_q[["POLYGON_ID", "quality_weight"]], on="POLYGON_ID", how="inner"
+            )
+
+            # By-year aggregates
+            yr_raw  = txn_q.groupby("deal_year").size().rename("raw")
+            yr_qa   = txn_q.groupby("deal_year")["quality_weight"].sum().rename("qa")
+            yr_df   = pd.concat([yr_raw, yr_qa], axis=1).reset_index()
+            yr_df   = yr_df[yr_df["deal_year"].between(1998, 2024)].copy()
+
+            # Price index from year FEs (exp-transform; 1998 = 1.0 baseline)
+            b_w2     = np.array(stage1_info["b_w"])
+            hv2      = stage1_info["house_vars"]
+            cmap2    = dict(zip(hv2, b_w2))
+            yr_df["price_idx"] = yr_df["deal_year"].apply(
+                lambda y: np.exp(cmap2.get(f"yr_{y}", 0.0))
+            )
+
+            # Normalise supply indices to 1998 base
+            base = yr_df[yr_df["deal_year"] == 1998].iloc[0]
+            yr_df["raw_idx"] = yr_df["raw"]  / base["raw"]
+            yr_df["qa_idx"]  = yr_df["qa"]   / base["qa"]
+
+            # ── Fig E-1: dual-axis time series ──────────────────────────────
+            fig, ax1 = plt.subplots(figsize=(11, 4.5))
+            ax2 = ax1.twinx()
+
+            ax1.fill_between(yr_df["deal_year"], yr_df["qa_idx"],
+                             alpha=0.25, color="#2C7BB6", label="_nolegend_")
+            ax1.plot(yr_df["deal_year"], yr_df["qa_idx"],
+                     color="#2C7BB6", lw=2, marker="o", ms=4,
+                     label="Quality-adjusted supply index")
+            ax1.plot(yr_df["deal_year"], yr_df["raw_idx"],
+                     color="#2C7BB6", lw=1.2, ls="--", marker="s", ms=3,
+                     label="Raw transaction count index")
+            ax2.plot(yr_df["deal_year"], yr_df["price_idx"],
+                     color="#E04A2F", lw=2, marker="^", ms=4,
+                     label="Price index (exp year FE)")
+
+            ax1.set_xlabel("Year", fontsize=10)
+            ax1.set_ylabel("Supply index (1998 = 1)", fontsize=10, color="#2C7BB6")
+            ax2.set_ylabel("Price index (1998 = 1)",  fontsize=10, color="#E04A2F")
+            ax1.tick_params(axis="y", labelcolor="#2C7BB6")
+            ax2.tick_params(axis="y", labelcolor="#E04A2F")
+
+            lines1, labels1 = ax1.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=8, loc="upper left")
+            ax1.set_title(
+                "Quality-Adjusted Housing Supply & Price Index (1998–2024)\n"
+                "Supply = transactions weighted by hedonic location premium",
+                fontsize=11)
+            ax1.grid(alpha=0.3)
+            plt.tight_layout()
+            plt.savefig(f"{MAPS_DIR}/supply_price_index_timeseries.png",
+                        dpi=150, bbox_inches="tight")
+            plt.close()
+
+            # ── Fig E-2: scatter — QA supply index vs. price index ─────────
+            fig, ax = plt.subplots(figsize=(6, 5))
+            sc = ax.scatter(yr_df["qa_idx"], yr_df["price_idx"],
+                            c=yr_df["deal_year"], cmap="RdYlGn_r",
+                            s=60, zorder=3, edgecolors="k", lw=0.4)
+            for _, row in yr_df.iterrows():
+                ax.annotate(str(int(row["deal_year"])),
+                            (row["qa_idx"], row["price_idx"]),
+                            fontsize=6.5, ha="left", va="bottom",
+                            xytext=(3, 2), textcoords="offset points")
+            # OLS trend
+            ok = np.isfinite(yr_df["qa_idx"]) & np.isfinite(yr_df["price_idx"])
+            z  = np.polyfit(yr_df.loc[ok, "qa_idx"], yr_df.loc[ok, "price_idx"], 1)
+            xr = np.linspace(yr_df["qa_idx"].min(), yr_df["qa_idx"].max(), 100)
+            ax.plot(xr, np.polyval(z, xr), "k--", lw=1.2, alpha=0.6)
+            r, p = stats.pearsonr(yr_df.loc[ok, "qa_idx"], yr_df.loc[ok, "price_idx"])
+            plt.colorbar(sc, ax=ax, label="Year")
+            ax.set_xlabel("Quality-adjusted supply index (1998 = 1)", fontsize=10)
+            ax.set_ylabel("Price index — exp(year FE) (1998 = 1)", fontsize=10)
+            ax.set_title(
+                f"Quality-Adjusted Supply vs. Price Index by Year\n"
+                f"Pearson r = {r:.2f}  (p = {p:.3f})",
+                fontsize=11)
+            ax.grid(alpha=0.3)
+            plt.tight_layout()
+            plt.savefig(f"{MAPS_DIR}/supply_vs_price_scatter.png",
+                        dpi=150, bbox_inches="tight")
+            plt.close()
+
+            # save year-level data to JSON for paper
+            yr_records = yr_df.rename(columns={"deal_year": "year"}).to_dict(orient="records")
+            import json as _json_fig
+            with open(f"{PROCESSED_DIR}/supply_price_index.json", "w") as fh:
+                _json_fig.dump(yr_records, fh, indent=2)
+
+        except Exception as e:
+            print(f"  skip supply/price index figures: {e}")
+
     print("  figures saved to", MAPS_DIR)
 
 
@@ -776,7 +881,7 @@ def main():
     b_w, house_vars, fe_df, stage1_info = estimate_stage1(df_txn)
     merged = merge_with_urbanism(fe_df)
     stage2_results, city_fe = run_stage2(merged)
-    make_figures(merged, city_fe, stage1_info)
+    make_figures(merged, city_fe, stage1_info, df_txn=df_txn, fe_df=fe_df)
     save_results(b_w, house_vars, stage1_info, stage2_results)
     print("\nDone.")
 

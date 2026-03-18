@@ -33,6 +33,10 @@ pdfmetrics.registerFont(TTFont("LibMono",        f"{_MONO_DIR}/LiberationMono-Re
 pdfmetrics.registerFont(TTFont("LibMono-Bold",   f"{_MONO_DIR}/LiberationMono-Bold.ttf"))
 pdfmetrics.registerFont(TTFont("LibSans-Bold",   "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"))
 
+_DEJAVU_DIR = "/usr/share/fonts/truetype/dejavu"
+pdfmetrics.registerFont(TTFont("DejaVuSerif",      f"{_DEJAVU_DIR}/DejaVuSerif.ttf"))
+pdfmetrics.registerFont(TTFont("DejaVuSerif-Bold", f"{_DEJAVU_DIR}/DejaVuSerif-Bold.ttf"))
+
 # ── Styles ─────────────────────────────────────────────────────────────────
 
 def make_styles():
@@ -96,8 +100,10 @@ def make_styles():
         spaceAfter=4, alignment=TA_JUSTIFY))
 
     styles.add(ParagraphStyle("Equation",
-        fontSize=11, leading=16, fontName="LibMono",
-        spaceAfter=6, alignment=TA_CENTER))
+        fontSize=11, leading=18, fontName="DejaVuSerif",
+        spaceBefore=6, spaceAfter=8, alignment=TA_CENTER,
+        borderPadding=(4, 20, 4, 20),
+        backColor=colors.HexColor("#F8F8F8")))
 
     styles.add(ParagraphStyle("Keywords",
         fontSize=10, leading=14, fontName="LibSerif",
@@ -1002,18 +1008,20 @@ def build_story():
     story.append(Paragraph(
         "log(price_usd)ᵢⱼ  =  αⱼ  +  Xᵢⱼ β  +  γₜ  +  εᵢⱼ",
         S["Equation"]))
-    p("where αⱼ is a POLYGON_ID (gush-block) fixed effect, γₜ are year fixed effects "
-      "(2019–2023; reference: 2018), and Xᵢⱼ is a vector of all available apartment "
-      "and building characteristics: log(rooms), building age, building age², "
-      "log(floors in building), apartment floor number, relative floor position "
-      "(floor / total floors), a new-project indicator, and a penthouse indicator. "
+    p("where α<sub>j</sub> is a POLYGON_ID (gush-block) fixed effect, γ<sub>t</sub> are "
+      "year fixed effects (1999–2024; reference: 1998), and X<sub>ij</sub> is a vector of "
+      "all available apartment and building characteristics: log(rooms), building age, "
+      "building age², log(floors in building), apartment floor number, relative floor "
+      "position (floor / total floors), a new-project indicator, and a penthouse indicator. "
       "Floor numbers are parsed from the Hebrew-text FLOORNO field using a comprehensive "
       "ordinal dictionary; missing floors are imputed with the block-level median. "
-      "Together, Xᵢⱼ β captures all observable dwelling-level heterogeneity, so that "
-      "α̂ⱼ reflects the pure location premium—the price a fully standardized apartment "
-      "commands in gush block j. "
+      "Together, X<sub>ij</sub> β captures all observable dwelling-level heterogeneity, "
+      "so that <font name='DejaVuSerif'>α̂</font><sub>j</sub> reflects the pure location "
+      "premium—the price a fully standardized apartment commands in gush block j. "
       "Estimation uses the within-group (demeaning) transformation: demean all variables "
-      "by POLYGON_ID, run OLS to obtain β̂, then recover α̂ⱼ = ȳⱼ − β̂' x̄ⱼ.")
+      "by POLYGON_ID, run OLS to obtain <font name='DejaVuSerif'>β̂</font>, then recover "
+      "<font name='DejaVuSerif'>α̂</font><sub>j</sub> = "
+      "ȳ<sub>j</sub> − <font name='DejaVuSerif'>β̂</font>′ x̄<sub>j</sub>.")
     sp()
 
     # Stage 1 results table
@@ -1039,11 +1047,7 @@ def build_story():
         "floor_pos_imp":     "Floor position (floor / total floors)",
         "is_new_project":    "New-project indicator",
         "is_penthouse":      "Penthouse indicator",
-        "yr_2019": "Year = 2019",
-        "yr_2020": "Year = 2020",
-        "yr_2021": "Year = 2021",
-        "yr_2022": "Year = 2022",
-        "yr_2023": "Year = 2023",
+        **{f"yr_{y}": f"Year = {y}" for y in range(1999, 2025)},
     }
 
     t_s1_data = [["Variable", "Coefficient", "Interpretation"]]
@@ -1056,11 +1060,7 @@ def build_story():
         "floor_pos_imp":    "relative floor position effect",
         "is_new_project":   "new-development premium",
         "is_penthouse":     "penthouse premium",
-        "yr_2019": "price change 2018→2019",
-        "yr_2020": "price change 2018→2020",
-        "yr_2021": "price change 2018→2021",
-        "yr_2022": "price change 2018→2022",
-        "yr_2023": "price change 2018→2023",
+        **{f"yr_{y}": f"price change 1998\u2192{y}" for y in range(1999, 2025)},
     }
     for v in var_names:
         lbl = STAGE1_LABELS.get(v, v)
@@ -1075,8 +1075,8 @@ def build_story():
         S["H3"]))
     story.append(t_s1)
     story.append(Paragraph(
-        "Within-group (POLYGON_ID) OLS estimator. All transactions 2018–2023 "
-        f"in gush blocks with ≥ 5 transactions. Reference year: 2018.",
+        "Within-group (POLYGON_ID) OLS estimator. All transactions 1998–2024 "
+        f"in gush blocks with ≥ 5 transactions. Reference year: 1998.",
         S["TableNote"]))
     sp()
 
@@ -1100,25 +1100,54 @@ def build_story():
       f"with supply effects in high-rise buildings. Each additional floor in apartment "
       f"position adds {_floor_pct:.1f}% to price; penthouses command a "
       f"{_pent_pct:.0f}% premium. "
-      f"The year fixed effects document the sharp Israeli housing price appreciation: "
-      f"prices rose {_yr21*100:.0f} log points in 2021, reaching "
+      f"The year fixed effects trace the full Israeli price cycle from 1998 to 2024: "
+      f"prices peaked in 2008–2009 (post-GFC recovery), plateaued through 2017, then "
+      f"accelerated sharply—rising {_yr21*100:.0f} log points by 2021 and "
       f"{_yr22*100:.0f} and {_yr23*100:.0f} log points cumulatively "
-      f"by 2022–2023—consistent with the macro evidence of a significant housing boom.")
+      f"by 2022–2023—consistent with the macro evidence of a significant housing boom. "
+      f"Figure S1 shows the full year-FE series; Figure S4 relates the quality-adjusted "
+      f"supply index to the price index across all years.")
 
     # Figures: FE by city + year FE
-    fig_fe_city = os.path.join(MAPS_DIR, "hedonic_fe_by_city.png")
-    fig_yr_fe   = os.path.join(MAPS_DIR, "hedonic_year_fe.png")
+    fig_fe_city  = os.path.join(MAPS_DIR, "hedonic_fe_by_city.png")
+    fig_yr_fe    = os.path.join(MAPS_DIR, "hedonic_year_fe.png")
+    fig_ts       = os.path.join(MAPS_DIR, "supply_price_index_timeseries.png")
+    fig_sp_scat  = os.path.join(MAPS_DIR, "supply_vs_price_scatter.png")
     if os.path.exists(fig_yr_fe):
-        story.append(Image(fig_yr_fe, width=10*cm, height=5*cm))
+        story.append(Image(fig_yr_fe, width=14*cm, height=5.5*cm))
         story.append(Paragraph(
-            "Figure S1. Stage 1 year fixed effects. The sharp increase in 2021–2023 "
-            "reflects the macro housing price boom, controlled out before Stage 2.",
+            "Figure S1. Stage 1 year fixed effects (1998–2024; reference year = 1998). "
+            "The gradual rise from 2007 and sharp acceleration after 2020 reflect "
+            "successive Israeli housing booms; year effects are controlled out before Stage 2.",
             S["Caption"]))
         sp(0.3)
+    if os.path.exists(fig_ts):
+        story.append(Image(fig_ts, width=15*cm, height=6*cm))
+        story.append(Paragraph(
+            "Figure S4. Quality-adjusted housing supply index and price index, 1998–2024. "
+            "Blue solid line: annual transaction volume weighted by each gush block's "
+            "hedonic location premium (quality-adjusted supply index, left axis, 1998 = 1). "
+            "Blue dashed line: raw transaction count index (left axis). "
+            "Red line: price index exp(year FE) from Stage 1 (right axis, 1998 = 1). "
+            "Rising prices with relatively flat quality-adjusted supply reflects "
+            "the persistent effective housing shortage.",
+            S["Caption"]))
+        sp(0.3)
+    if os.path.exists(fig_sp_scat):
+        story.append(Image(fig_sp_scat, width=10*cm, height=8.5*cm))
+        story.append(Paragraph(
+            "Figure S5. Scatter plot: quality-adjusted supply index vs. price index by year "
+            "(1998–2024). Each point is one calendar year; colour indicates year (green = "
+            "earlier, red = later). The positive correlation confirms that years with more "
+            "effective supply transacted are also years of higher price levels—consistent "
+            "with rising quality and demand rather than supply-driven price moderation.",
+            S["Caption"]))
+        sp(0.4)
     if os.path.exists(fig_fe_city):
         story.append(Image(fig_fe_city, width=15*cm, height=6*cm))
         story.append(Paragraph(
-            "Figure S2. Distribution of gush-block location premiums (α̂ⱼ) by city. "
+            "Figure S2. Distribution of gush-block location premiums "
+            "(<font name='DejaVuSerif'>α̂</font><sub>j</sub>) by city. "
             "Each box shows the interquartile range; median marked in black. "
             "Tel Aviv blocks command the highest premiums; Be'er Sheva and peripheral "
             "cities the lowest.",
@@ -1126,7 +1155,8 @@ def build_story():
         sp(0.4)
 
     h("Stage 2: Location Premiums on Urbanism Metrics", 3)
-    p("In Stage 2 we regress the estimated gush-block fixed effects α̂ⱼ on city-level "
+    p("In Stage 2 we regress the estimated gush-block fixed effects "
+      "<font name='DejaVuSerif'>α̂</font><sub>j</sub> on city-level "
       "urbanism metrics, with standard errors clustered by city (16 clusters):")
     story.append(Paragraph(
         "α̂ⱼ  =  δ₀  +  δ₁ · urbanism_city(j)  +  νⱼ",
@@ -1191,7 +1221,8 @@ def build_story():
         f"Gush-level columns: N = {_n_gush:,} gush blocks, cluster-robust SE "
         f"(cluster = city, {_G} clusters). "
         f"City-level columns: N = {_n_city} cities, homoskedastic OLS. "
-        "Dependent variable: Stage 1 POLYGON_ID fixed effect α̂ⱼ. "
+        "Dependent variable: Stage 1 POLYGON_ID fixed effect "
+        "<font name='DejaVuSerif'>α̂</font><sub>j</sub>. "
         "*** p < 0.01; ** p < 0.05; * p < 0.10.",
         S["TableNote"]))
     sp()
@@ -1212,7 +1243,7 @@ def build_story():
     p("The comparison between Stage 2 and the Section 6 city-level correlations is "
       "instructive. In Section 6, the Pearson correlation between walkability and median "
       "price is 0.44 (p = 0.047). In Stage 2, the walkability coefficient on the "
-      "composition-adjusted α̂ is smaller and insignificant. By contrast, street density "
+      "composition-adjusted <font name='DejaVuSerif'>α̂</font> is smaller and insignificant. By contrast, street density "
       "and amenity density <i>strengthen</i> in Stage 2 relative to Section 6. This "
       "pattern is consistent with the hypothesis that walkability indices partly proxy "
       "for housing stock quality (walkable cities have newer, larger apartments), while "
@@ -1223,7 +1254,8 @@ def build_story():
     if os.path.exists(fig_s2):
         story.append(Image(fig_s2, width=15*cm, height=5.5*cm))
         story.append(Paragraph(
-            "Figure S3. Stage 2 scatter plots: city-aggregated Stage 1 FEs (α̂, "
+            "Figure S3. Stage 2 scatter plots: city-aggregated Stage 1 FEs "
+            "(<font name='DejaVuSerif'>α̂</font>, "
             "composition-adjusted) vs. walkability index, street density, and "
             "amenity density. Cities at the top-right have both high urbanism quality "
             "and high location premiums, controlling for apartment size and age.",
