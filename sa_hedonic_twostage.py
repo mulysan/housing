@@ -709,18 +709,23 @@ def make_figures(merged, city_fe, stage1_info, df_txn=None, fe_df=None):
             med_fe = np.median(fe_q["fe"].values)
             fe_q["quality_weight"] = np.exp(fe_q["fe"] - med_fe)   # normalised to median=1
 
-            # Merge with transaction-level data (only blocks in fe_df)
-            txn_q = df_txn[["POLYGON_ID", "deal_year"]].merge(
+            # ── Filter to NEW construction only (is_new_project == 1) ────────
+            new_col = "is_new_project"
+            if new_col not in df_txn.columns:
+                raise ValueError("is_new_project column missing from df_txn")
+            txn_new = df_txn[df_txn[new_col] == 1][["POLYGON_ID", "deal_year"]].copy()
+            txn_q = txn_new.merge(
                 fe_q[["POLYGON_ID", "quality_weight"]], on="POLYGON_ID", how="inner"
             )
 
-            # By-year aggregates
+            # By-year aggregates (new construction only)
             yr_raw  = txn_q.groupby("deal_year").size().rename("raw")
             yr_qa   = txn_q.groupby("deal_year")["quality_weight"].sum().rename("qa")
             yr_df   = pd.concat([yr_raw, yr_qa], axis=1).reset_index()
-            yr_df   = yr_df[yr_df["deal_year"].between(1998, 2024)].copy()
+            # Focus on years with meaningful new-construction data
+            yr_df   = yr_df[yr_df["deal_year"].between(2009, 2024)].copy()
 
-            # Price index from year FEs (exp-transform; 1998 = 1.0 baseline)
+            # Price index from year FEs (exp-transform; 2009 = 1.0 baseline)
             b_w2     = np.array(stage1_info["b_w"])
             hv2      = stage1_info["house_vars"]
             cmap2    = dict(zip(hv2, b_w2))
@@ -728,10 +733,11 @@ def make_figures(merged, city_fe, stage1_info, df_txn=None, fe_df=None):
                 lambda y: np.exp(cmap2.get(f"yr_{y}", 0.0))
             )
 
-            # Normalise supply indices to 1998 base
-            base = yr_df[yr_df["deal_year"] == 1998].iloc[0]
-            yr_df["raw_idx"] = yr_df["raw"]  / base["raw"]
-            yr_df["qa_idx"]  = yr_df["qa"]   / base["qa"]
+            # Normalise all indices to 2009 base
+            base = yr_df[yr_df["deal_year"] == 2009].iloc[0]
+            yr_df["raw_idx"]   = yr_df["raw"]        / base["raw"]
+            yr_df["qa_idx"]    = yr_df["qa"]          / base["qa"]
+            yr_df["price_idx"] = yr_df["price_idx"]  / base["price_idx"]
 
             # ── Fig E-1: dual-axis time series ──────────────────────────────
             fig, ax1 = plt.subplots(figsize=(11, 4.5))
@@ -741,17 +747,18 @@ def make_figures(merged, city_fe, stage1_info, df_txn=None, fe_df=None):
                              alpha=0.25, color="#2C7BB6", label="_nolegend_")
             ax1.plot(yr_df["deal_year"], yr_df["qa_idx"],
                      color="#2C7BB6", lw=2, marker="o", ms=4,
-                     label="Quality-adjusted supply index")
+                     label="Quality-adjusted new-construction supply index")
             ax1.plot(yr_df["deal_year"], yr_df["raw_idx"],
                      color="#2C7BB6", lw=1.2, ls="--", marker="s", ms=3,
-                     label="Raw transaction count index")
+                     label="Raw new-unit count index")
             ax2.plot(yr_df["deal_year"], yr_df["price_idx"],
                      color="#E04A2F", lw=2, marker="^", ms=4,
-                     label="Price index (exp year FE)")
+                     label="Price index — exp(year FE)")
 
             ax1.set_xlabel("Year", fontsize=10)
-            ax1.set_ylabel("Supply index (1998 = 1)", fontsize=10, color="#2C7BB6")
-            ax2.set_ylabel("Price index (1998 = 1)",  fontsize=10, color="#E04A2F")
+            ax1.set_ylabel("New-construction supply index (2009 = 1)",
+                           fontsize=10, color="#2C7BB6")
+            ax2.set_ylabel("Price index (2009 = 1)", fontsize=10, color="#E04A2F")
             ax1.tick_params(axis="y", labelcolor="#2C7BB6")
             ax2.tick_params(axis="y", labelcolor="#E04A2F")
 
@@ -759,8 +766,9 @@ def make_figures(merged, city_fe, stage1_info, df_txn=None, fe_df=None):
             lines2, labels2 = ax2.get_legend_handles_labels()
             ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=8, loc="upper left")
             ax1.set_title(
-                "Quality-Adjusted Housing Supply & Price Index (1998–2024)\n"
-                "Supply = transactions weighted by hedonic location premium",
+                "New-Construction Supply Index vs. Price Index (2009–2024)\n"
+                "New-unit supply = new-project transactions weighted by hedonic "
+                "location premium",
                 fontsize=11)
             ax1.grid(alpha=0.3)
             plt.tight_layout()
@@ -785,10 +793,11 @@ def make_figures(merged, city_fe, stage1_info, df_txn=None, fe_df=None):
             ax.plot(xr, np.polyval(z, xr), "k--", lw=1.2, alpha=0.6)
             r, p = stats.pearsonr(yr_df.loc[ok, "qa_idx"], yr_df.loc[ok, "price_idx"])
             plt.colorbar(sc, ax=ax, label="Year")
-            ax.set_xlabel("Quality-adjusted supply index (1998 = 1)", fontsize=10)
-            ax.set_ylabel("Price index — exp(year FE) (1998 = 1)", fontsize=10)
+            ax.set_xlabel(
+                "Quality-adjusted new-construction supply index (2009 = 1)", fontsize=10)
+            ax.set_ylabel("Price index — exp(year FE) (2009 = 1)", fontsize=10)
             ax.set_title(
-                f"Quality-Adjusted Supply vs. Price Index by Year\n"
+                f"Quality-Adjusted New Supply vs. Price Index by Year\n"
                 f"Pearson r = {r:.2f}  (p = {p:.3f})",
                 fontsize=11)
             ax.grid(alpha=0.3)

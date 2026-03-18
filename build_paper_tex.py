@@ -1,3 +1,167 @@
+"""
+Generate paper.tex from analysis results and compile to paper_latex.pdf.
+Dynamic values are read from JSON result files.
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
+PROC_DIR  = os.path.join(BASE_DIR, "data", "processed")
+MAPS_DIR  = os.path.join(PROC_DIR, "maps")
+OUT_TEX   = os.path.join(BASE_DIR, "paper.tex")
+OUT_PDF   = os.path.join(BASE_DIR, "paper_latex.pdf")
+
+# ── Load dynamic results ────────────────────────────────────────────────────
+
+def load_json(path, default=None):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return default or {}
+
+ht   = load_json(os.path.join(PROC_DIR, "hedonic_twostage_results.json"))
+sa   = load_json(os.path.join(PROC_DIR, "sa_summary_stats.json"))
+corr = load_json(os.path.join(PROC_DIR, "regression_results.json"))
+
+s1      = ht.get("stage1", {})
+coefs   = s1.get("coefs", {})
+n_txn   = s1.get("n_txn",    548335)
+n_block = s1.get("n_blocks",  37997)
+r2_w    = s1.get("r2_within", 0.602)
+
+biv_g = ht.get("stage2_gush", {})
+biv_c = ht.get("stage2_city", {})
+
+gush_n   = sa.get("gush_level", {}).get("n_observations",   57007)
+gush_med = sa.get("gush_level", {}).get("median_price_usd", 362000)
+city_n   = sa.get("city_level", {}).get("n_cities",            20)
+avg_cv   = sa.get("city_level", {}).get("avg_price_cv",       0.37)
+
+def pval_stars(p):
+    if p < 0.01: return r"$^{***}$"
+    if p < 0.05: return r"$^{**}$"
+    if p < 0.10: return r"$^{*}$"
+    return ""
+
+def fmt_coef(m, src):
+    d = src.get(m, {})
+    if not d:
+        return ("--", "--", "--", "")
+    return (
+        f"{d.get('coef', 0):+.5f}",
+        f"{d.get('se',   0):.5f}",
+        f"{d.get('pval', 1):.3f}",
+        pval_stars(d.get("pval", 1)),
+    )
+
+# ── Helpers ─────────────────────────────────────────────────────────────────
+
+def esc(s):
+    """Escape special LaTeX characters in plain text."""
+    for old, new in [
+        ("&",  r"\&"),
+        ("%",  r"\%"),
+        ("$",  r"\$"),
+        ("#",  r"\#"),
+        ("_",  r"\_"),
+        ("{",  r"\{"),
+        ("}",  r"\}"),
+        ("~",  r"\textasciitilde{}"),
+        ("^",  r"\textasciicircum{}"),
+        ("\\", r"\textbackslash{}"),
+    ]:
+        s = s.replace(old, new)
+    return s
+
+def fig_path(name):
+    """Return relative path for \includegraphics."""
+    return os.path.join("data", "processed", "maps", name).replace("\\", "/")
+
+# ── Stage 1 coefficient table rows ──────────────────────────────────────────
+
+STAGE1_LABELS = {
+    "log_rooms":        r"$\log(\text{rooms})$",
+    "building_age":     r"Building age (years)",
+    "building_age_sq":  r"Building age$^2$ / 1{,}000",
+    "log_bldg_floors":  r"$\log(\text{floors in building})$",
+    "floor_num_imp":    r"Apartment floor number",
+    "floor_pos_imp":    r"Floor position (floor / total floors)",
+    "is_new_project":   r"New-project indicator",
+    "is_penthouse":     r"Penthouse indicator",
+}
+for yr in range(1999, 2025):
+    STAGE1_LABELS[f"yr_{yr}"] = fr"Year $= {yr}$"
+
+INTERP = {
+    "log_rooms":        "size premium per doubling",
+    "building_age":     "linear depreciation",
+    "building_age_sq":  "depreciation curvature",
+    "log_bldg_floors":  "height/type premium",
+    "floor_num_imp":    "premium per floor",
+    "floor_pos_imp":    "relative position effect",
+    "is_new_project":   "new-development premium",
+    "is_penthouse":     "penthouse premium",
+}
+for yr in range(1999, 2025):
+    INTERP[f"yr_{yr}"] = fr"price change $1998 \to {yr}$"
+
+s1_rows = []
+for v in s1.get("house_vars", list(coefs.keys())):
+    label = STAGE1_LABELS.get(v, v.replace("_", r"\_"))
+    c     = coefs.get(v, 0.0)
+    interp = INTERP.get(v, "")
+    s1_rows.append(f"    {label} & ${c:+.5f}$ & {interp} \\\\")
+
+s1_table_body = "\n".join(s1_rows)
+
+# ── Stage 2 table rows ───────────────────────────────────────────────────────
+
+MLABELS = {
+    "walkability_index":     r"Walkability Index (0--100)",
+    "junction_density":      r"Junction Density (int./km$^2$)",
+    "street_density_km_km2": r"Street Density (km/km$^2$)",
+    "amenity_density":       r"Amenity Density (POIs/km$^2$)",
+    "dead_end_ratio":        r"Dead-End Ratio",
+    "circuity_avg":          r"Circuity",
+}
+METRIC_ORDER = [
+    "street_density_km_km2", "amenity_density",
+    "junction_density",      "walkability_index",
+    "dead_end_ratio",        "circuity_avg",
+]
+
+s2_rows = []
+for m in METRIC_ORDER:
+    gc, gse, gp, gs = fmt_coef(m, biv_g)
+    cc, cse, cp, cs = fmt_coef(m, biv_c)
+    label = MLABELS.get(m, m)
+    s2_rows.append(
+        f"    {label} & ${gc}$ & ${gse}$ & ${gp}${gs} & ${cc}$ & ${cse}$ & ${cp}${cs} \\\\"
+    )
+s2_table_body = "\n".join(s2_rows)
+
+_n_gush = next(iter(biv_g.values()), {}).get("n", 38009)
+_G      = next(iter(biv_g.values()), {}).get("G", 20)
+_n_city = next(iter(biv_c.values()), {}).get("n", 20)
+
+# ── Dynamic inline values ────────────────────────────────────────────────────
+_rooms_pct  = int(round((2 ** coefs.get("log_rooms", 0.549) - 1) * 100))
+_yr07       = coefs.get("yr_2007", 0.091)
+_yr09       = coefs.get("yr_2009", 0.355)
+_yr21       = coefs.get("yr_2021", 1.074)
+_yr22       = coefs.get("yr_2022", 1.195)
+_yr23       = coefs.get("yr_2023", 1.244)
+_floor_pct  = coefs.get("floor_num_imp", 0.015) * 100
+_pent_pct   = coefs.get("is_penthouse",  0.051) * 100
+_bldg_coef  = coefs.get("log_bldg_floors", -0.041)
+
+# ── Build LaTeX document ─────────────────────────────────────────────────────
+
+TEX = r"""
 \documentclass[12pt,a4paper]{article}
 
 %% ── Packages ────────────────────────────────────────────────────────────────
@@ -192,8 +356,8 @@ peripheral areas with lower land costs but also lower walkability and amenity de
 
 \paragraph{Urban heterogeneity.}
 Our sample of 21 cities exhibits enormous heterogeneity in both prices and urban form.
-Tel Aviv (median price \ILS{}3.2M; walkability index 74.6; amenity density 437/km$^2$) is at
-one extreme; Be'er Sheva (median price \ILS{}885K; walkability index 40.3; amenity density
+Tel Aviv (median price ₪3.2M; walkability index 74.6; amenity density 437/km$^2$) is at
+one extreme; Be'er Sheva (median price ₪885K; walkability index 40.3; amenity density
 29.4/km$^2$) at the other.
 
 %%═══════════════════════════════════════════════════════════════════════════
@@ -217,7 +381,7 @@ sample comprises approximately 548{,}000 transactions across 20 cities.
 \begin{threeparttable}
 \begin{tabular}{lrrrr}
 \toprule
-City & N Deals & Median Price (\ILS{}) & Mean Price (\ILS{}) & Price/Room (\ILS{}) \\
+City & N Deals & Median Price (₪) & Mean Price (₪) & Price/Room (₪) \\
 \midrule
 Tel Aviv--Jaffa   & 21{,}072 & 3{,}200{,}000 & 3{,}641{,}425 & 1{,}046{,}667 \\
 Herzliya          &  3{,}947 & 2{,}525{,}000 & 2{,}769{,}953 &   656{,}250 \\
@@ -363,15 +527,15 @@ not by Spearman ($\rho = 0.359$, $p = 0.111$).
 \subsection{Economic Magnitude}
 
 Moving from the 25th to the 75th percentile of amenity density (27 to 175~POIs/km$^2$)
-is associated with a price premium of approximately 17\%---roughly \ILS{}260{,}000 per
+is associated with a price premium of approximately 17\%---roughly ₪260{,}000 per
 apartment.  Moving from the 25th to the 75th percentile of street density is associated
-with a price increase of approximately 45\%---from \ILS{}1.4M to \ILS{}2.0M.
+with a price increase of approximately 45\%---from ₪1.4M to ₪2.0M.
 
 \subsection{Figures}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{data/processed/maps/scatter_all_metrics_en.png}
+  \includegraphics[width=0.95\textwidth]{""" + fig_path("scatter_all_metrics_en.png") + r"""}
   \caption{Scatter plots: all six urbanism metrics vs.\ median apartment price.
     Red dashed line = OLS regression.  Pearson $r$ annotated.}
   \label{fig:scatter}
@@ -379,7 +543,7 @@ with a price increase of approximately 45\%---from \ILS{}1.4M to \ILS{}2.0M.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{data/processed/maps/correlation_heatmap_en.png}
+  \includegraphics[width=0.95\textwidth]{""" + fig_path("correlation_heatmap_en.png") + r"""}
   \caption{Correlation heatmap: Pearson $r$ (left) and Spearman $\rho$ (right).
     Significance stars: $^{*}p<0.05$, $^{**}p<0.01$, $^{***}p<0.001$.}
   \label{fig:heatmap}
@@ -417,7 +581,7 @@ the market average.  Define the \textbf{locational quality multiplier} for city 
 \end{equation}
 
 where $\bar{P}_i$ is the city's median apartment price and $\bar{P}$ is the national
-sample median ($\approx$ \ILS{}1.6M in our dataset).  The effective housing supply in city $i$
+sample median ($\approx$ ₪1.6M in our dataset).  The effective housing supply in city $i$
 is then:
 
 \begin{equation}
@@ -432,7 +596,7 @@ $\lambda_{\text{BS}} < 1$.
 \subsection{Calibration for Israel}
 
 Table~\ref{tab:multipliers} reports locational quality multipliers for selected cities,
-calibrated using the national median price of \ILS{}1.6M.
+calibrated using the national median price of ₪1.6M.
 
 \begin{table}[H]
 \centering
@@ -441,7 +605,7 @@ calibrated using the national median price of \ILS{}1.6M.
 \begin{threeparttable}
 \begin{tabular}{lrrrr}
 \toprule
-City & Median Price (\ILS{}) & $\lambda_i$ & Walkability & Amenity Density \\
+City & Median Price (₪) & $\lambda_i$ & Walkability & Amenity Density \\
 \midrule
 Tel Aviv     & 3{,}200{,}000 & 2.00 & 74.6 & 437.4 \\
 Ra'anana     & 2{,}580{,}000 & 1.61 & 66.2 & 143.0 \\
@@ -458,7 +622,7 @@ Be'er Sheva  &   885{,}000 & 0.55 & 40.3 &  29.4 \\
 \end{tabular}
 \begin{tablenotes}
 \small
-\item $\lambda_i = \bar{P}_i / \text{\ILS{}}1{,}600{,}000$ (national sample median).
+\item $\lambda_i = \bar{P}_i / \text{₪}1{,}600{,}000$ (national sample median).
   Building 100 physical units in Tel Aviv provides 200 effective units;
   in Be'er Sheva, only 55 effective units.
 \end{tablenotes}
@@ -479,7 +643,7 @@ Our findings connect to the \citet{hsieh2019} spatial misallocation argument.  I
 model, the relevant price for labour allocation is the per-unit cost of housing
 services---the effective price, not the raw transaction price.  Tel Aviv's walkability
 index of 74.6 and amenity density of 437/km$^2$ make it the most productive residential
-location in our sample, yet its median price (\ILS{}3.2M) is 3.6 times that of Be'er Sheva.
+location in our sample, yet its median price (₪3.2M) is 3.6 times that of Be'er Sheva.
 
 %%═══════════════════════════════════════════════════════════════════════════
 \section{Policy Implications}
@@ -521,10 +685,10 @@ dataset with over 57{,}000 observations.
 \toprule
 Statistic & Value \\
 \midrule
-Total gush-block observations     & 57,007 \\
-Cities covered                    & 20 \\
-National median price (USD)       & 362,000 \\
-Avg.\ within-city price CV        & 3.59 \\
+Total gush-block observations     & """ + f"{gush_n:,}" + r""" \\
+Cities covered                    & """ + str(city_n) + r""" \\
+National median price (USD)       & """ + f"{gush_med:,.0f}" + r""" \\
+Avg.\ within-city price CV        & """ + f"{avg_cv:.2f}" + r""" \\
 Sample period                     & 1998--2024 \\
 \bottomrule
 \end{tabular}
@@ -532,7 +696,7 @@ Sample period                     & 1998--2024 \\
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{data/processed/maps/sa_within_city_variation.png}
+  \includegraphics[width=0.95\textwidth]{""" + fig_path("sa_within_city_variation.png") + r"""}
   \caption{Within-city housing price distributions at the gush-block level.
     Panel A: box plots of gush-block median prices for the 10 largest cities.
     Panel B: price coefficient of variation (CV) vs.\ log total transactions.}
@@ -572,49 +736,16 @@ fixed effect as
 \begin{table}[H]
 \centering
 \caption{Stage 1 Hedonic Coefficients
-  ($N = 548,335$ transactions,
-   $37,997$ gush blocks,
-   within-$R^2 = 0.602$)}
+  ($N = """ + f"{n_txn:,}" + r"""$ transactions,
+   $""" + f"{n_block:,}" + r"""$ gush blocks,
+   within-$R^2 = """ + f"{r2_w:.3f}" + r"""$)}
 \label{tab:stage1}
 \begin{threeparttable}
 \begin{tabular}{llr}
 \toprule
 Variable & Coefficient & Interpretation \\
 \midrule
-    $\log(\text{rooms})$ & $+0.54852$ & size premium per doubling \\
-    Building age (years) & $-0.00859$ & linear depreciation \\
-    Building age$^2$ / 1{,}000 & $+0.10938$ & depreciation curvature \\
-    $\log(\text{floors in building})$ & $-0.04059$ & height/type premium \\
-    Apartment floor number & $+0.01501$ & premium per floor \\
-    Floor position (floor / total floors) & $-0.02923$ & relative position effect \\
-    New-project indicator & $-0.00711$ & new-development premium \\
-    Penthouse indicator & $+0.05118$ & penthouse premium \\
-    Year $= 1999$ & $+0.02721$ & price change $1998 \to 1999$ \\
-    Year $= 2000$ & $-0.03174$ & price change $1998 \to 2000$ \\
-    Year $= 2001$ & $-0.04476$ & price change $1998 \to 2001$ \\
-    Year $= 2002$ & $+0.03483$ & price change $1998 \to 2002$ \\
-    Year $= 2003$ & $+0.00524$ & price change $1998 \to 2003$ \\
-    Year $= 2004$ & $+0.00481$ & price change $1998 \to 2004$ \\
-    Year $= 2005$ & $+0.02938$ & price change $1998 \to 2005$ \\
-    Year $= 2006$ & $+0.05384$ & price change $1998 \to 2006$ \\
-    Year $= 2007$ & $+0.09126$ & price change $1998 \to 2007$ \\
-    Year $= 2008$ & $+0.20476$ & price change $1998 \to 2008$ \\
-    Year $= 2009$ & $+0.35488$ & price change $1998 \to 2009$ \\
-    Year $= 2010$ & $+0.50529$ & price change $1998 \to 2010$ \\
-    Year $= 2011$ & $+0.57908$ & price change $1998 \to 2011$ \\
-    Year $= 2012$ & $+0.61026$ & price change $1998 \to 2012$ \\
-    Year $= 2013$ & $+0.67545$ & price change $1998 \to 2013$ \\
-    Year $= 2014$ & $+0.73372$ & price change $1998 \to 2014$ \\
-    Year $= 2015$ & $+0.81606$ & price change $1998 \to 2015$ \\
-    Year $= 2016$ & $+0.90504$ & price change $1998 \to 2016$ \\
-    Year $= 2017$ & $+0.95972$ & price change $1998 \to 2017$ \\
-    Year $= 2018$ & $+0.97273$ & price change $1998 \to 2018$ \\
-    Year $= 2019$ & $+0.98236$ & price change $1998 \to 2019$ \\
-    Year $= 2020$ & $+1.00616$ & price change $1998 \to 2020$ \\
-    Year $= 2021$ & $+1.07383$ & price change $1998 \to 2021$ \\
-    Year $= 2022$ & $+1.19455$ & price change $1998 \to 2022$ \\
-    Year $= 2023$ & $+1.24351$ & price change $1998 \to 2023$ \\
-    Year $= 2024$ & $+1.30136$ & price change $1998 \to 2024$ \\
+""" + s1_table_body + r"""
 \bottomrule
 \end{tabular}
 \begin{tablenotes}
@@ -626,22 +757,22 @@ blocks with $\geq 5$ transactions.  Reference year: 1998.
 \end{table}
 
 The Stage 1 results confirm that house characteristics are significant price determinants.
-The $\log(\text{rooms})$ coefficient of 0.549 implies that each
-doubling of room count raises price by 46\%.  Building age exhibits the expected
+The $\log(\text{rooms})$ coefficient of """ + f"{coefs.get('log_rooms', 0.549):.3f}" + r""" implies that each
+doubling of room count raises price by """ + str(_rooms_pct) + r"""\%.  Building age exhibits the expected
 negative curvature: new construction commands a premium, with depreciation accelerating at
-older vintages.  The $\log(\text{building floors})$ coefficient of -0.041 indicates
+older vintages.  The $\log(\text{building floors})$ coefficient of """ + f"{_bldg_coef:+.3f}" + r""" indicates
 that apartments in taller buildings trade at a slight discount per unit, consistent with
 supply effects in high-rise buildings.  Each additional floor in apartment position adds
-1.5\% to price; penthouses command a 5\% premium.
+""" + f"{_floor_pct:.1f}" + r"""\% to price; penthouses command a """ + f"{_pent_pct:.0f}" + r"""\% premium.
 
 The year fixed effects trace the full Israeli price cycle from 1998 to 2024.  Prices rose
-9 log points by 2007 and 35 log points by 2009, then accelerated sharply:
-107 log points by 2021 and 119 log points by 2022---consistent with the
+""" + f"{_yr07*100:.0f}" + r""" log points by 2007 and """ + f"{_yr09*100:.0f}" + r""" log points by 2009, then accelerated sharply:
+""" + f"{_yr21*100:.0f}" + r""" log points by 2021 and """ + f"{_yr22*100:.0f}" + r""" log points by 2022---consistent with the
 macro evidence of successive Israeli housing booms.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.90\textwidth]{data/processed/maps/hedonic_year_fe.png}
+  \includegraphics[width=0.90\textwidth]{""" + fig_path("hedonic_year_fe.png") + r"""}
   \caption{Stage 1 year fixed effects (1998--2024; reference year $= 1998$).
     The gradual rise from 2007 and sharp acceleration after 2020 reflect successive
     Israeli housing booms; year effects are controlled out before Stage~2.}
@@ -650,7 +781,7 @@ macro evidence of successive Israeli housing booms.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{data/processed/maps/supply_price_index_timeseries.png}
+  \includegraphics[width=0.95\textwidth]{""" + fig_path("supply_price_index_timeseries.png") + r"""}
   \caption{Quality-adjusted housing supply index and price index, 1998--2024.
     \textit{Blue solid line}: annual transaction volume weighted by each gush block's
     hedonic location premium (quality-adjusted supply index, left axis, $1998 = 1$).
@@ -663,7 +794,7 @@ macro evidence of successive Israeli housing booms.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.60\textwidth]{data/processed/maps/supply_vs_price_scatter.png}
+  \includegraphics[width=0.60\textwidth]{""" + fig_path("supply_vs_price_scatter.png") + r"""}
   \caption{Scatter plot: quality-adjusted supply index vs.\ price index by year
     (1998--2024).  Each point is one calendar year; colour indicates year (earlier =
     green, later = red).  The positive correlation suggests that rising prices coincide
@@ -673,7 +804,7 @@ macro evidence of successive Israeli housing booms.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{data/processed/maps/hedonic_fe_by_city.png}
+  \includegraphics[width=0.95\textwidth]{""" + fig_path("hedonic_fe_by_city.png") + r"""}
   \caption{Distribution of gush-block location premiums $\hat{\alpha}_j$ by city.
     Each box shows the interquartile range; median marked in black.
     Tel Aviv blocks command the highest premiums; Be'er Sheva and peripheral cities
@@ -684,7 +815,7 @@ macro evidence of successive Israeli housing booms.
 \subsection{Stage 2: Location Premiums on Urbanism Metrics}
 
 In Stage 2 we regress the estimated gush-block fixed effects $\hat{\alpha}_j$ on
-city-level urbanism metrics, with standard errors clustered by city ($20$ clusters):
+city-level urbanism metrics, with standard errors clustered by city ($""" + str(_G) + r"""$ clusters):
 
 \begin{equation}
   \hat{\alpha}_j \;=\; \delta_0 \;+\; \delta_1 \cdot \text{urbanism}_{c(j)} \;+\; \nu_j
@@ -705,22 +836,17 @@ building age.
 \small
 \begin{tabular}{lcccccccc}
 \toprule
- & \multicolumn{4}{c}{Gush-level ($N=38,009$)} &
-   \multicolumn{4}{c}{City-level ($N=20$)} \\
+ & \multicolumn{4}{c}{Gush-level ($N=""" + f"{_n_gush:,}" + r"""$)} &
+   \multicolumn{4}{c}{City-level ($N=""" + str(_n_city) + r"""$)} \\
 \cmidrule(lr){2-5}\cmidrule(lr){6-9}
 Metric & Coef. & SE & $p$ & Sig. & Coef. & SE & $p$ & Sig. \\
 \midrule
-    Street Density (km/km$^2$) & $+0.04384$ & $0.00787$ & $0.000$$^{***}$ & $+0.03268$ & $0.00792$ & $0.001$$^{***}$ \\
-    Amenity Density (POIs/km$^2$) & $+0.00200$ & $0.00028$ & $0.000$$^{***}$ & $+0.00189$ & $0.00054$ & $0.002$$^{***}$ \\
-    Junction Density (int./km$^2$) & $+0.01044$ & $0.00215$ & $0.000$$^{***}$ & $+0.00740$ & $0.00234$ & $0.005$$^{***}$ \\
-    Walkability Index (0--100) & $+0.02192$ & $0.00645$ & $0.003$$^{***}$ & $+0.01285$ & $0.00507$ & $0.021$$^{**}$ \\
-    Dead-End Ratio & $+1.23969$ & $0.90102$ & $0.185$ & $+1.65714$ & $1.04695$ & $0.131$ \\
-    Circuity & $-0.01165$ & $0.54205$ & $0.983$ & $+0.50412$ & $0.52371$ & $0.349$ \\
+""" + s2_table_body + r"""
 \bottomrule
 \end{tabular}
 \begin{tablenotes}
 \small
-\item Gush-level: cluster-robust SE (cluster $=$ city, 20 clusters).
+\item Gush-level: cluster-robust SE (cluster $=$ city, """ + str(_G) + r""" clusters).
   City-level: homoskedastic OLS.
   Dependent variable: Stage~1 fixed effect $\hat{\alpha}_j$.
   $^{***}p < 0.01$; $^{**}p < 0.05$; $^{*}p < 0.10$.
@@ -730,7 +856,7 @@ Metric & Coef. & SE & $p$ & Sig. & Coef. & SE & $p$ & Sig. \\
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{data/processed/maps/hedonic_stage2_scatter.png}
+  \includegraphics[width=0.95\textwidth]{""" + fig_path("hedonic_stage2_scatter.png") + r"""}
   \caption{Stage~2 scatter plots: city-aggregated Stage~1 fixed effects $\hat{\alpha}$
     (composition-adjusted) vs.\ walkability index, street density, and amenity density.
     Cities at the top-right have both high urbanism quality and high location premiums,
@@ -876,3 +1002,44 @@ Johns Hopkins University Press.
 \end{thebibliography}
 
 \end{document}
+"""
+
+# ── Write .tex ───────────────────────────────────────────────────────────────
+
+# Replace characters that pdflatex can't handle with LaTeX commands
+TEX = TEX.replace("₪", r"\ILS{}")
+
+with open(OUT_TEX, "w", encoding="utf-8") as fh:
+    fh.write(TEX.lstrip())
+
+print(f"TeX written  → {OUT_TEX}")
+
+# ── Compile ──────────────────────────────────────────────────────────────────
+
+def compile_pdf():
+    print("Compiling PDF (pass 1)…")
+    cmd = ["pdflatex", "-interaction=nonstopmode",
+           "-output-directory", BASE_DIR, OUT_TEX]
+    r1 = subprocess.run(cmd, capture_output=True, cwd=BASE_DIR)
+    stdout = r1.stdout.decode("latin-1", errors="replace")
+    if r1.returncode != 0:
+        log_lines = stdout.splitlines()
+        errors = [l for l in log_lines if l.startswith("!") or "Error" in l]
+        print("Errors:", "\n".join(errors[-20:]))
+        return False
+    print("Compiling PDF (pass 2 — resolve refs)…")
+    subprocess.run(cmd, capture_output=True, cwd=BASE_DIR)
+    # rename output to paper_latex.pdf
+    base = os.path.splitext(OUT_TEX)[0]
+    src  = base + ".pdf"
+    if os.path.exists(src):
+        os.replace(src, OUT_PDF)
+        print(f"PDF written  → {OUT_PDF}  ({os.path.getsize(OUT_PDF)//1024} KB)")
+        return True
+    return False
+
+if compile_pdf():
+    print("Done.")
+else:
+    print("Compilation failed — check paper.tex manually.")
+    sys.exit(1)
