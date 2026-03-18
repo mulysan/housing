@@ -15,79 +15,92 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAPS_DIR = os.path.join(BASE_DIR, "data", "processed", "maps")
 OUT_PDF  = os.path.join(BASE_DIR, "paper.pdf")
+
+# ── Register Unicode-capable fonts ─────────────────────────────────────────
+_SERIF_DIR = "/usr/share/fonts/truetype/liberation"
+_MONO_DIR  = "/usr/share/fonts/truetype/liberation"
+
+pdfmetrics.registerFont(TTFont("LibSerif",       f"{_SERIF_DIR}/LiberationSerif-Regular.ttf"))
+pdfmetrics.registerFont(TTFont("LibSerif-Bold",  f"{_SERIF_DIR}/LiberationSerif-Bold.ttf"))
+pdfmetrics.registerFont(TTFont("LibSerif-Italic",f"{_SERIF_DIR}/LiberationSerif-Italic.ttf"))
+pdfmetrics.registerFont(TTFont("LibSerif-BoldItalic", f"{_SERIF_DIR}/LiberationSerif-BoldItalic.ttf"))
+pdfmetrics.registerFont(TTFont("LibMono",        f"{_MONO_DIR}/LiberationMono-Regular.ttf"))
+pdfmetrics.registerFont(TTFont("LibMono-Bold",   f"{_MONO_DIR}/LiberationMono-Bold.ttf"))
+pdfmetrics.registerFont(TTFont("LibSans-Bold",   "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"))
 
 # ── Styles ─────────────────────────────────────────────────────────────────
 
 def make_styles():
     styles = getSampleStyleSheet()
 
-    base = dict(fontName="Times-Roman", leading=18, spaceAfter=6)
+    base = dict(fontName="LibSerif", leading=18, spaceAfter=6)
 
     styles.add(ParagraphStyle("PaperTitle",
         parent=styles["Title"],
-        fontSize=16, leading=20, fontName="Times-Bold",
+        fontSize=16, leading=20, fontName="LibSerif-Bold",
         spaceAfter=6, alignment=TA_CENTER))
 
     styles.add(ParagraphStyle("PaperSubtitle",
-        fontSize=12, leading=16, fontName="Times-Roman",
+        fontSize=12, leading=16, fontName="LibSerif",
         spaceAfter=4, alignment=TA_CENTER))
 
     styles.add(ParagraphStyle("PaperAuthor",
-        fontSize=11, leading=14, fontName="Times-Italic",
+        fontSize=11, leading=14, fontName="LibSerif-Italic",
         spaceAfter=12, alignment=TA_CENTER))
 
     styles.add(ParagraphStyle("AbstractTitle",
-        fontSize=11, leading=14, fontName="Times-Bold",
+        fontSize=11, leading=14, fontName="LibSerif-Bold",
         spaceAfter=4, alignment=TA_CENTER))
 
     styles.add(ParagraphStyle("Abstract",
-        fontSize=10, leading=14, fontName="Times-Roman",
+        fontSize=10, leading=14, fontName="LibSerif",
         leftIndent=1.5*cm, rightIndent=1.5*cm,
         spaceAfter=8, alignment=TA_JUSTIFY))
 
     styles.add(ParagraphStyle("H1",
-        fontSize=13, leading=18, fontName="Times-Bold",
+        fontSize=13, leading=18, fontName="LibSerif-Bold",
         spaceBefore=16, spaceAfter=6))
 
     styles.add(ParagraphStyle("H2",
-        fontSize=11, leading=16, fontName="Times-Bold",
+        fontSize=11, leading=16, fontName="LibSerif-Bold",
         spaceBefore=12, spaceAfter=4))
 
     styles.add(ParagraphStyle("H3",
-        fontSize=11, leading=15, fontName="Times-BoldItalic",
+        fontSize=11, leading=15, fontName="LibSerif-BoldItalic",
         spaceBefore=8, spaceAfter=3))
 
     styles.add(ParagraphStyle("Body",
-        fontSize=11, leading=18, fontName="Times-Roman",
+        fontSize=11, leading=18, fontName="LibSerif",
         spaceAfter=6, alignment=TA_JUSTIFY))
 
     styles.add(ParagraphStyle("BodySmall",
-        fontSize=9.5, leading=14, fontName="Times-Roman",
+        fontSize=9.5, leading=14, fontName="LibSerif",
         spaceAfter=4, alignment=TA_JUSTIFY))
 
     styles.add(ParagraphStyle("Caption",
-        fontSize=9, leading=12, fontName="Times-Italic",
+        fontSize=9, leading=12, fontName="LibSerif-Italic",
         spaceAfter=6, alignment=TA_CENTER))
 
     styles.add(ParagraphStyle("TableNote",
-        fontSize=8.5, leading=11, fontName="Times-Roman",
+        fontSize=8.5, leading=11, fontName="LibSerif",
         spaceAfter=4))
 
     styles.add(ParagraphStyle("RefEntry",
-        fontSize=9.5, leading=13, fontName="Times-Roman",
+        fontSize=9.5, leading=13, fontName="LibSerif",
         leftIndent=1.2*cm, firstLineIndent=-1.2*cm,
         spaceAfter=4, alignment=TA_JUSTIFY))
 
     styles.add(ParagraphStyle("Equation",
-        fontSize=11, leading=16, fontName="Courier",
+        fontSize=11, leading=16, fontName="LibMono",
         spaceAfter=6, alignment=TA_CENTER))
 
     styles.add(ParagraphStyle("Keywords",
-        fontSize=10, leading=14, fontName="Times-Roman",
+        fontSize=10, leading=14, fontName="LibSerif",
         leftIndent=1.5*cm, rightIndent=1.5*cm,
         spaceAfter=8))
 
@@ -99,7 +112,7 @@ def header_style():
     return TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2C3E50')),
         ('TEXTCOLOR',  (0,0), (-1,0), colors.white),
-        ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTNAME',   (0,0), (-1,0), 'LibSans-Bold'),
         ('FONTSIZE',   (0,0), (-1,-1), 8.5),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F5F5F5'), colors.white]),
         ('GRID',       (0,0), (-1,-1), 0.4, colors.HexColor('#CCCCCC')),
