@@ -136,6 +136,79 @@ def ols_clustered(y, X_raw, cluster_ids):
                 r2=r2, n=n, G=G, resid=resid)
 
 
+# ── Hebrew floor-number parser ────────────────────────────────────────────────
+
+# Maps Hebrew ordinal words → integer floor numbers (ground = 0, basement = -1)
+_HEB_FLOOR = {
+    # ground / basement / special
+    "קרקע": 0, "קרקע ": 0,
+    "מרתף": -1, "מרתף ": -1,
+    "גג": 99,         # penthouse flag
+    "גלריה": 99,
+    "ביניים": 0, "בניים": 0, "בנים": 0, "יציע": 0, "עמודים": 0,
+    # single-letter abbreviations (alef=1, bet=2, etc.)
+    "א": 1, "ב": 2, "ג": 3, "ד": 4, "ה": 5,
+    "ו": 6, "ז": 7, "ח": 8, "ט": 9, "י": 10,
+    # feminine ordinals 1–10
+    "ראשונה": 1, "ראשון": 1,
+    "שניה": 2,  "שנייה": 2, "שני": 2,
+    "שלישית": 3, "שלישי": 3,
+    "רביעית": 4, "רביעי": 4,
+    "חמישית": 5, "חמישי": 5,
+    "שישית": 6,  "שישי": 6,
+    "שביעית": 7, "שביעי": 7,
+    "שמינית": 8, "שמיני": 8,
+    "תשיעית": 9, "תשיעי": 9,
+    "עשירית": 10, "עשירי": 10,
+    # teens
+    "אחת עשרה": 11, "אחד עשר": 11,
+    "שתים עשרה": 12, "שתיים עשרה": 12, "שניים עשר": 12,
+    "שלוש עשרה": 13, "שלושה עשר": 13,
+    "ארבע עשרה": 14, "ארבעה עשר": 14,
+    "חמש עשרה": 15,  "חמישה עשר": 15,
+    "שש עשרה": 16,   "שישה עשר": 16,
+    "שבע עשרה": 17,  "שבעה עשר": 17,
+    "שמונה עשרה": 18,
+    "תשע עשרה": 19,  "תשעה עשר": 19,
+    # tens
+    "עשרים": 20,
+    "שלושים": 30,
+    "ארבעים": 40,
+    "חמישים": 50,
+}
+
+import re as _re
+
+def _parse_floor(raw) -> tuple:
+    """
+    Return (floor_num, is_penthouse).
+    floor_num: integer floor (ground=0, basement=-1) or NaN
+    is_penthouse: 1 if גג/penthouse, else 0
+    For multi-floor entries take the first (lowest) floor.
+    """
+    if pd.isna(raw):
+        return np.nan, 0
+    s = str(raw).strip()
+    # strip RTL marks
+    s_clean = _re.sub(r'[\u200e\u200f]', '', s)
+
+    # 1. try embedded Arabic numerals first (handles קומה ‎2‏ pattern)
+    nums = _re.findall(r'-?\d+', s_clean)
+    if nums:
+        n = int(nums[0])
+        return n, int(n >= 15)   # treat very high floors as penthouse-ish
+
+    # 2. try Hebrew ordinal map – longest match first
+    for key in sorted(_HEB_FLOOR, key=len, reverse=True):
+        if key in s:
+            val = _HEB_FLOOR[key]
+            if val == 99:
+                return np.nan, 1   # penthouse – don't assign numeric floor
+            return val, 0
+
+    return np.nan, 0
+
+
 def stars(p):
     if p < 0.01: return "***"
     if p < 0.05: return "**"
@@ -156,7 +229,8 @@ def load_transactions():
             df = pd.read_excel(
                 f,
                 usecols=["DEALAMOUNT", "POLYGON_ID", "DEALDATE",
-                         "ASSETROOMNUM", "BUILDINGYEAR", "BUILDINGFLOORS"],
+                         "ASSETROOMNUM", "BUILDINGYEAR", "BUILDINGFLOORS",
+                         "FLOORNO", "NEWPROJECTTEXT"],
             )
             df["city_en"]   = city_en
             df["city_code"] = city_code
@@ -194,11 +268,43 @@ def load_transactions():
     df = df[df["rooms"].between(1, 15)].copy()
     df["log_rooms"] = np.log(df["rooms"])
 
-    # ── parse building age ────────────────────────────────────────────────────
+    # ── parse building year / age ─────────────────────────────────────────────
     df["build_year"] = pd.to_numeric(df["BUILDINGYEAR"], errors="coerce")
     df = df[df["build_year"].between(1920, 2024)].copy()
     df["building_age"]    = df["deal_year"] - df["build_year"]
     df["building_age_sq"] = df["building_age"] ** 2 / 1_000   # scale for numerics
+    # building decade dummies (captures nonlinear vintage effects)
+    df["decade"] = (df["build_year"] // 10 * 10).clip(1930, 2020)
+
+    # ── number of floors in building ──────────────────────────────────────────
+    df["bldg_floors"] = pd.to_numeric(df["BUILDINGFLOORS"], errors="coerce")
+    df["bldg_floors"] = df["bldg_floors"].where(df["bldg_floors"].between(1, 60))
+    # log(floors): proxy for building height / type (low-rise vs high-rise)
+    df["log_bldg_floors"] = np.log(df["bldg_floors"].fillna(df["bldg_floors"].median()))
+
+    # ── apartment floor number ────────────────────────────────────────────────
+    parsed = df["FLOORNO"].apply(_parse_floor)
+    df["floor_num"]     = [x[0] for x in parsed]
+    df["is_penthouse"]  = [x[1] for x in parsed]
+    # clip implausible floors
+    df["floor_num"] = df["floor_num"].where(df["floor_num"].between(-2, 60))
+    # relative floor position = floor / building_floors (0-1), if both available
+    df["floor_pos"] = np.where(
+        df["floor_num"].notna() & df["bldg_floors"].notna() & (df["bldg_floors"] > 0),
+        df["floor_num"] / df["bldg_floors"],
+        np.nan,
+    )
+    # impute missing floor_num with block-level median for FE demeaning
+    block_floor_med = df.groupby("POLYGON_ID")["floor_num"].transform("median")
+    df["floor_num_imp"] = df["floor_num"].fillna(block_floor_med)
+    df["floor_pos_imp"] = df["floor_pos"].fillna(
+        df.groupby("POLYGON_ID")["floor_pos"].transform("median")
+    )
+    floor_known = df["floor_num"].notna().mean()
+    print(f"  floor number parsed: {floor_known*100:.1f}% of rows")
+
+    # ── new project dummy ─────────────────────────────────────────────────────
+    df["is_new_project"] = (df["NEWPROJECTTEXT"] == 1).astype(float)
 
     # ── parse POLYGON_ID ──────────────────────────────────────────────────────
     df["POLYGON_ID"] = df["POLYGON_ID"].astype(str).str.strip()
@@ -228,7 +334,21 @@ def estimate_stage1(df):
     print("\nStage 1 – within-group FE estimation …")
 
     YEAR_DUMMIES = [f"yr_{y}" for y in range(2019, 2024)]
-    HOUSE_VARS   = ["log_rooms", "building_age", "building_age_sq"] + YEAR_DUMMIES
+    HOUSE_VARS   = [
+        # dwelling characteristics
+        "log_rooms",
+        # building age & vintage
+        "building_age", "building_age_sq",
+        # building height / type
+        "log_bldg_floors",
+        # apartment floor (imputed medians for missing; relative position)
+        "floor_num_imp", "floor_pos_imp",
+        # new-project premium
+        "is_new_project",
+        # penthouse
+        "is_penthouse",
+        # year macro controls
+    ] + YEAR_DUMMIES
 
     # ── keep only blocks with >= MIN_TXN_PER_BLOCK observations ──────────────
     block_n = df.groupby("POLYGON_ID").size()
@@ -239,11 +359,25 @@ def estimate_stage1(df):
 
     # ── within-group demeaning ────────────────────────────────────────────────
     all_vars = ["log_price"] + HOUSE_VARS
+    # fill any remaining NaN with column-level median before demeaning
+    for v in HOUSE_VARS:
+        med = df2[v].median()
+        df2[v] = df2[v].fillna(med)
+
     group_means = df2.groupby("POLYGON_ID")[all_vars].transform("mean")
     df_within = df2[all_vars].subtract(group_means)   # demeaned
 
     y_w = df_within["log_price"].values
-    X_w = df_within[HOUSE_VARS].values
+    X_raw = df_within[HOUSE_VARS].values
+
+    # Drop columns with near-zero within-group variance (would be singular)
+    col_std = X_raw.std(axis=0)
+    active = col_std > 1e-10
+    HOUSE_VARS_ACTIVE = [v for v, a in zip(HOUSE_VARS, active) if a]
+    dropped = [v for v, a in zip(HOUSE_VARS, active) if not a]
+    if dropped:
+        print(f"  dropping zero-variance columns: {dropped}")
+    X_w = X_raw[:, active]
 
     # OLS on demeaned data (no intercept needed after demeaning)
     b_w, *_ = np.linalg.lstsq(X_w, y_w, rcond=None)
@@ -252,20 +386,22 @@ def estimate_stage1(df):
     resid_w = y_w - X_w @ b_w
     r2_w = 1 - np.sum(resid_w**2) / np.sum((y_w - y_w.mean())**2)
     print(f"  Stage 1 within-R²: {r2_w:.4f}")
-    print(f"  Coefficients: log_rooms={b_w[0]:.4f}, "
-          f"building_age={b_w[1]:.4f}, building_age_sq={b_w[2]:.6f}")
+    print(f"  Active regressors: {len(HOUSE_VARS_ACTIVE)}")
+    for nm, bv in zip(HOUSE_VARS_ACTIVE[:4], b_w[:4]):
+        print(f"    {nm}: {bv:.5f}")
 
     # ── recover FEs: α̂_j = ȳ_j – β̂' x̄_j ─────────────────────────────────
     # group means
     grp = df2.groupby(["POLYGON_ID", "city_en"])[all_vars].mean()
     grp = grp.reset_index()
 
-    Xbar = grp[HOUSE_VARS].values
+    Xbar = grp[HOUSE_VARS_ACTIVE].values
     ybar = grp["log_price"].values
     fe   = ybar - Xbar @ b_w
 
     # ── SE of FE: based on within-group variance / n_j ───────────────────────
     sigma2_w = np.sum(resid_w**2) / max(len(y_w) - len(b_w) - len(good_blocks), 1)
+    k_active = len(b_w)
     n_j = df2.groupby("POLYGON_ID").size().reindex(grp["POLYGON_ID"]).values
     fe_se = np.sqrt(sigma2_w / n_j)
 
@@ -285,7 +421,7 @@ def estimate_stage1(df):
 
     stage1_info = dict(
         b_w=b_w.tolist(),
-        house_vars=HOUSE_VARS,
+        house_vars=HOUSE_VARS_ACTIVE,
         r2_within=r2_w,
         n_txn=len(df2),
         n_blocks=len(good_blocks),
@@ -436,9 +572,11 @@ def make_figures(merged, city_fe, stage1_info):
     print("\nGenerating figures …")
 
     # ── Fig A: Stage 1 year FE plot ──────────────────────────────────────────
-    b_w = np.array(stage1_info["b_w"])
+    b_w      = np.array(stage1_info["b_w"])
+    hv       = stage1_info["house_vars"]
+    coef_map = dict(zip(hv, b_w))
     yr_labels = ["2018 (ref)", "2019", "2020", "2021", "2022", "2023"]
-    yr_coefs  = [0.0] + b_w[3:].tolist()   # first 3 are log_rooms, age, age_sq
+    yr_coefs  = [0.0] + [coef_map.get(f"yr_{y}", 0.0) for y in range(2019, 2024)]
     fig, ax = plt.subplots(figsize=(7, 3.5))
     ax.bar(yr_labels, yr_coefs, color="#2C7BB6", alpha=0.8)
     ax.axhline(0, color="k", lw=0.8)
@@ -562,9 +700,7 @@ def save_results(b_w, house_vars, stage1_info, stage2_results):
     lines.append(f"  Within-R²:      {stage1_info['r2_within']:.4f}")
     lines.append(f"\n  {'Variable':<25s}  {'Coef':>10s}")
     lines.append(f"  {'-'*37}")
-    names = ["log(rooms)", "building_age", "building_age²/1000"] + \
-            [f"year={y}" for y in range(2019, 2024)]
-    for nm, b in zip(names, b_w):
+    for nm, b in zip(stage1_info["house_vars"], b_w):
         lines.append(f"  {nm:<25s}  {b:>10.5f}")
 
     lines.append("\n" + "=" * 70)
@@ -603,8 +739,8 @@ def save_results(b_w, house_vars, stage1_info, stage2_results):
             n_txn=stage1_info["n_txn"],
             n_blocks=stage1_info["n_blocks"],
             r2_within=stage1_info["r2_within"],
-            house_vars=names,
-            coefs=dict(zip(names, [float(x) for x in b_w])),
+            house_vars=stage1_info["house_vars"],
+            coefs=dict(zip(stage1_info["house_vars"], [float(x) for x in b_w])),
         ),
         stage2_gush=stage2_results["bivariate_gush"],
         stage2_multivariate_gush=stage2_results["multivariate_gush"],

@@ -1000,15 +1000,20 @@ def build_story():
     h("Stage 1: Hedonic Regression with Gush-Block Fixed Effects", 3)
     p("In Stage 1 we estimate a transaction-level hedonic regression:")
     story.append(Paragraph(
-        "log(price_usd)ᵢⱼ  =  αⱼ  +  β₁ log(rooms)ᵢⱼ  +  β₂ age_ᵢⱼ  +  β₃ age²_ᵢⱼ  +  γₜ  +  εᵢⱼ",
+        "log(price_usd)ᵢⱼ  =  αⱼ  +  Xᵢⱼ β  +  γₜ  +  εᵢⱼ",
         S["Equation"]))
-    p("where αⱼ is a POLYGON_ID (gush-block) fixed effect, age_ᵢⱼ = deal_year − building_year, "
-      "and γₜ are year fixed effects (2019–2023; reference: 2018). The fixed effect αⱼ "
-      "captures the pure location premium of gush block j—the price a standardized dwelling "
-      "(same rooms, same age) commands in that neighborhood, net of macro time trends. "
-      "Estimation uses the within-group (demeaning) transformation to avoid inverting a "
-      "10,000-column dummy matrix: we demean all variables by POLYGON_ID, run OLS on the "
-      "demeaned data to obtain β̂, then recover α̂ⱼ = ȳⱼ − β̂' x̄ⱼ.")
+    p("where αⱼ is a POLYGON_ID (gush-block) fixed effect, γₜ are year fixed effects "
+      "(2019–2023; reference: 2018), and Xᵢⱼ is a vector of all available apartment "
+      "and building characteristics: log(rooms), building age, building age², "
+      "log(floors in building), apartment floor number, relative floor position "
+      "(floor / total floors), a new-project indicator, and a penthouse indicator. "
+      "Floor numbers are parsed from the Hebrew-text FLOORNO field using a comprehensive "
+      "ordinal dictionary; missing floors are imputed with the block-level median. "
+      "Together, Xᵢⱼ β captures all observable dwelling-level heterogeneity, so that "
+      "α̂ⱼ reflects the pure location premium—the price a fully standardized apartment "
+      "commands in gush block j. "
+      "Estimation uses the within-group (demeaning) transformation: demean all variables "
+      "by POLYGON_ID, run OLS to obtain β̂, then recover α̂ⱼ = ȳⱼ − β̂' x̄ⱼ.")
     sp()
 
     # Stage 1 results table
@@ -1029,6 +1034,11 @@ def build_story():
         "log(rooms)":          "log(rooms)",
         "building_age":        "Building age (years)",
         "building_age²/1000":  "Building age² / 1000",
+        "log(bldg_floors)":    "log(floors in building)",
+        "floor_num":           "Apartment floor number",
+        "floor_pos":           "Floor position (floor/total floors)",
+        "is_new_project":      "New-project indicator",
+        "is_penthouse":        "Penthouse indicator",
         "year=2019":  "Year = 2019",
         "year=2020":  "Year = 2020",
         "year=2021":  "Year = 2021",
@@ -1038,14 +1048,19 @@ def build_story():
 
     t_s1_data = [["Variable", "Coefficient", "Interpretation"]]
     INTERP = {
-        "log(rooms)":          "+53% per doubling of rooms",
-        "building_age":        "depreciation per year",
-        "building_age²/1000":  "nonlinear depreciation",
+        "log(rooms)":          "size premium per doubling of rooms",
+        "building_age":        "linear depreciation per year",
+        "building_age²/1000":  "nonlinear depreciation curvature",
+        "log(bldg_floors)":    "building height/type premium",
+        "floor_num":           "premium per floor (views, noise)",
+        "floor_pos":           "relative floor position effect",
+        "is_new_project":      "new-development premium",
+        "is_penthouse":        "penthouse premium",
         "year=2019":  "price change 2018→2019",
         "year=2020":  "price change 2018→2020",
-        "year=2021":  "price change 2018→2021 (+11%)",
-        "year=2022":  "price change 2018→2022 (+26%)",
-        "year=2023":  "price change 2018→2023 (+33%)",
+        "year=2021":  "price change 2018→2021",
+        "year=2022":  "price change 2018→2022",
+        "year=2023":  "price change 2018→2023",
     }
     for v in var_names:
         lbl = STAGE1_LABELS.get(v, v)
