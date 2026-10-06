@@ -1,0 +1,11 @@
+# data built by the fetch_* / build_* scripts (large, not committed)
+*.csv
+!scripts/osm_val/val_boxes.csv
+*.tsv
+*.parquet
+*.db
+*.npy
+*.b64
+*.wkb
+roads/
+housing_*.html
