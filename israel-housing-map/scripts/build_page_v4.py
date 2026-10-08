@@ -3,7 +3,7 @@
 #   housing_report.html  the analysis: indices, IV, hedonic, urban form, floor, variable maps, explorer
 # Inputs in cwd: parcels_v3.parquet, gush_v3.parquet, bld_fe.csv, sa_urban.csv, results_v3.json,
 # txn_v3.json, urban_v3.json, junc_val.json, floor_v3.json, floor_groups.json (build_floor_groups.py), km_v3.json (build_km.py), hedonic_v3.json, areas_v3.json,
-# iv_v3.json, varmap.b64, land-data.json, label-data.json, leaflet.css, roads/ (build_basemap_osm.py).
+# iv_v3.json, varmap.b64, varmap_info.json, var_dict.py, land-data.json, label-data.json, leaflet.css, roads/ (build_basemap_osm.py).
 # Usage: python build_page_v4.py MAP_URL REPORT_URL   (each page links to the other)
 # With --from-live live.html, the data blocks not rebuilt yet are taken from a published page.
 import sys, re, json, gzip, base64, os, numpy as np, pandas as pd
@@ -54,6 +54,10 @@ else:
 def data(fn, live_id):
     return open(fn).read() if os.path.exists(fn) else live_block(live_id)
 R = json.loads(data('results_v3.json', 'res'))
+def vardict():   # var_dict.py + labels from the variable map (varmap_info.json)
+    import var_dict
+    lab = json.load(open('varmap_info.json')).get('labels', {}) if os.path.exists('varmap_info.json') else {}
+    return json.dumps({'v': var_dict.V, 'src': var_dict.SRC, 'lab': lab}, ensure_ascii=False).replace('</', '<\\/')
 n_par = meta['n']
 SUB = (f'{round(n_par/1000)} אלף חלקות מגורים, כולל יהודה ושומרון. גזטיר הנכסים של מפ"י, עסקאות רשות המסים ו־govmap '
        '(1998 עד ספטמבר 2026), חלקות קדסטר, שכבות הלמ"ס ורשת הרחובות של OpenStreetMap.')
@@ -62,6 +66,7 @@ fill = {'/*META*/': json.dumps(meta, ensure_ascii=False), '/*PTS*/': pts, '/*GUS
         '/*TXN*/': data('txn_v3.json', 'txn-data'), '/*URB*/': data('urban_v3.json', 'urb-data'), '/*JVAL*/': data('junc_val.json', 'jval-data'),
         '/*FLOOR*/': data('floor_v3.json', 'floor-data'), '/*FLOORG*/': open('floor_groups.json').read(), '/*KM*/': open('km_v3.json').read(), '/*HED*/': data('hedonic_v3.json', 'hed-data'),
         '/*AREAS*/': data('areas_v3.json', 'areas-data'), '/*IV*/': data('iv_v3.json', 'iv-data'), '/*VARMAP*/': data('varmap.b64', 'varmap'),
+        '/*VARDICT*/': vardict(),
         '/*LAND*/': open('land-data.json').read(), '/*LABELS*/': open('label-data.json').read(),
         '/*LEAFLET_CSS*/': open('leaflet.css').read(), '/*SUB*/': SUB}
 T = open('map_v4_template.html').read()

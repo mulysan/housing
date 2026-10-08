@@ -55,14 +55,19 @@ HV = [
   ('d_cbd', 'מרחק למרכז תל אביב (ק"מ)', 'B', 'd_cbd', LG(0.5, 300, 18), True, 'ק"מ'),
   ('d_coast', 'מרחק לחוף (ק"מ)', 'B', 'd_coast', LG(0.1, 60, 18), True, 'ק"מ'),
   ('junc_dens', 'צמתים לקמ"ר (OSM, אזור סטטיסטי)', 'U', 'junc_dens', LG(5, 400, 20), True, ''),
+  ('junc_dens_walk', 'צמתים לקמ"ר (OSM, רשת הליכה)', 'U', 'junc_dens_walk', LG(5, 1000, 20), True, ''),
+  ('junc_dens_cad', 'צמתים לקמ"ר (קדסטר, השיטה הקודמת)', 'U', 'junc_dens_cad', LG(5, 400, 20), True, ''),
   ('street_dens', 'ק"מ רחוב לקמ"ר (OSM)', 'U', 'street_dens', LG(2, 60, 20), True, ''),
   ('deadend_share', 'שיעור רחובות ללא מוצא (OSM)', 'U', 'deadend_share', list(np.round(np.linspace(0, 0.8, 17), 3)), False, '%'),
+  ('fourway_share', 'שיעור צמתים של 4 רחובות ומעלה (OSM)', 'U', 'fourway_share', list(np.round(np.linspace(0, 0.8, 17), 3)), False, '%'),
   ('orient_ent', 'אנטרופיית כיווני רחובות (OSM)', 'U', 'orient_ent', list(np.round(np.linspace(0.5, 1, 21), 3)), False, ''),
   ('comm_dens', 'עסקים לקמ"ר (Overture)', 'U', 'comm_dens', LG(5, 5000, 20), True, ''),
   ('parking_dens', 'חניונים לקמ"ר (OSM)', 'U', 'parking_dens', LG(0.5, 200, 16), True, ''),
+  ('parking_share', 'שיעור השטח בחניונים ממופים', 'U', 'parking_share', list(np.round(np.linspace(0, 0.2, 21), 3)), False, '%'),
   ('circuity', 'עקמומיות רחובות', 'U', 'circuity', list(np.round(np.linspace(1.0, 1.3, 16), 3)), False, ''),
   ('haredi', 'קולות לחרדים (כנסת 25)', 'U', 'haredi', list(np.round(np.linspace(0, 1, 21), 3)), False, '%'),
   ('arab', 'קולות למפלגות ערביות (כנסת 25)', 'U', 'arab', list(np.round(np.linspace(0, 1, 21), 3)), False, '%'),
+  ('turnout', 'אחוז הצבעה (כנסת 25)', 'U', 'turnout', list(np.round(np.linspace(0.3, 1, 15), 3)), False, '%'),
   ('road_share', 'שיעור שטח דרכים (אזור סטטיסטי)', 'U', 'road_share', list(np.round(np.linspace(0, 0.5, 21), 3)), False, '%'),
   ('parcel_med', 'גודל חלקה חציוני (מ"ר)', 'U', 'parcel_med', LG(100, 20000, 20), True, 'מ"ר'),
   ('units_dens', 'דירות לקמ"ר (אזור סטטיסטי)', 'U', 'units_dens', LG(50, 50000, 20), True, ''),
@@ -70,10 +75,12 @@ HV = [
   ('mix', 'עירוב שימושים (אנטרופיה, 0–1)', 'U', 'mix', list(np.round(np.linspace(0, 0.8, 17), 3)), False, ''),
   ('comm_share', 'שיעור מסחר ומשרדים', 'U', 'comm_share', list(np.round(np.linspace(0, 0.6, 13), 3)), False, '%'),
   ('bus_dens', 'תחנות אוטובוס לקמ"ר', 'U', 'bus_dens', LG(1, 300, 18), True, ''),
+  ('school_dens', 'מוסדות חינוך לקמ"ר', 'U', 'school_dens', LG(0.5, 200, 18), True, ''),
   ('ses21', 'אשכול חברתי־כלכלי 2021', 'U', 'ses21', [0.5 + k for k in range(11)], False, ''),
   ('chg', 'שינוי מחיר בגוש, 2015 עד 2025', 'G', 'chg', list(np.round(np.linspace(-0.2, 1.4, 17), 3)), False, '%'),
   ('turn', 'עסקאות ל־100 דירות בשנה (גוש)', 'G', 'turn', LG(0.004, 0.15, 16), True, ''),
 ]
+import var_dict; _miss = [h[0] for h in HV if h[0] not in var_dict.V and h[0].replace('_pct', '') not in var_dict.V]; assert not _miss, _miss   # dictionary coverage
 FR = {'B': B, 'U': U, 'G': G}
 def hist(df, col, bins):
     v = df[col].astype(float).dropna().values

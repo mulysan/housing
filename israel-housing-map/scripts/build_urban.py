@@ -230,12 +230,19 @@ st = np.r_[np.c_[rail.lon*KX, rail.lat*KY], np.c_[lrt.lon*KX, lrt.lat*KY]]
 from scipy.spatial import cKDTree
 B['d_rail'] = cKDTree(st).query(np.c_[bx, by])[0]/1000
 B['d_cbd'] = np.hypot(bx - 34.7915*KX, by - 32.0745*KY)/1000            # Azrieli / Ha-Shalom, Tel Aviv
-land = json.load(open('land-data.json'))
-coast = np.array([p for poly in land['coordinates'] for ring in poly for p in ring])
-coast = coast[(coast[:, 1] > 31.25) & (coast[:, 1] < 33.1)]
-band = pd.Series(coast[:, 0]).groupby((coast[:, 1]*50).round()).min()         # westmost land per 0.02 deg lat
-cl = (B.lat*50).round().map(band)
-B['d_coast'] = np.where(B.lat.between(31.25, 33.1), (B.lon - cl)*KX/1000, np.nan)
+# Distance to the sea (km): straight-line distance to the nearest point of the coastline, taken from the
+# outer boundary of the Overture land polygon (Israel + West Bank + Gaza, land_full.wkb, merged so internal
+# borders vanish), densified to ~40 m. Coast = Mediterranean (boundary points between 31.2N and the Lebanese
+# border at 33.088N, west of 35.11E - the land borders there lie further east) plus the Red Sea at Eilat
+# (boundary south of 29.56N, east of 34.905E, i.e. the gulf shore between Taba and Aqaba).
+# (Until 2026-10-08 this used the westmost vertex of a coarse land outline per 0.02 deg latitude band; bands
+# with no coastal vertex picked up a point on the eastern border, so ~1/3 of buildings got a negative
+# distance, and Eilat and the south were missing.)
+_land = shapely.union_all(shapely.buffer(shapely.from_wkb(open('land_full.wkb', 'rb').read()), 0.0003))
+_ext = shapely.multilinestrings([p.exterior for p in getattr(_land, 'geoms', [_land])])
+_cc = shapely.get_coordinates(shapely.segmentize(_ext, 0.0004))
+_cc = _cc[((_cc[:, 1] > 31.2) & (_cc[:, 1] < 33.088) & (_cc[:, 0] < 35.11)) | ((_cc[:, 1] < 29.56) & (_cc[:, 0] > 34.905))]
+B['d_coast'] = cKDTree(np.c_[_cc[:, 0]*KX, _cc[:, 1]*KY]).query(np.c_[bx, by])[0]/1000
 # units in SA (gazetteer) -> residential density
 U['units'] = U.si.map(B.groupby('si').units.sum()).fillna(0)
 U['units_dens'] = U.units / U.urb_km2
@@ -274,133 +281,5 @@ B['fe'] = B.fe - np.average(B.fe.dropna(), weights=B.n.dropna())
 B.to_csv('bld_fe.csv', index=False)
 print('buildings with FE', B.fe.notna().sum())
 
-# ---------- regressions ----------
-B = B.merge(U[['si', 'junc_dens', 'junc_dens_cad', 'junc_dens_walk', 'street_dens', 'deadend_share', 'fourway_share', 'orient_ent', 'road_share', 'units_dens', 'pop_dens', 'addr_dens', 'bus_dens',
-               'school_dens', 'mix', 'comm_share', 'ses21', 'parcel_med', 'religion', 'yishuv', 'comm_dens', 'parking_dens',
-               'parking_share', 'circuity', 'rail_1km', 'haredi', 'utj', 'arab', 'turnout']], on='si', how='left')
-R = B[(B.n >= 3) & B.junc_dens.notna() & B.fe.notna()].copy()
-R = R[(R.junc_dens > 0) & (R.units_dens > 0) & R.d_coast.notna()]
-R = R[R.road_share.notna() & (R.parcel_med > 0)]       # cadastral form measures (not in Judea and Samaria)
-R = R[R.loc_q <= 4]                                     # drop locality-level locations (SA unknown)
-# new measures (2026-10-08): drop the few buildings whose SA lacks them (no vote match in the locality,
-# or under 1 km of drivable street for circuity), so every model uses the same sample
-_n0 = len(R); R = R[R.circuity.notna() & R.haredi.notna()]
-print('regression sample', len(R), 'dropped for missing circuity / votes', _n0 - len(R))
-R['l_junc'] = np.log(R.junc_dens); R['l_units'] = np.log(R.units_dens); R['l_bus'] = np.log1p(R.bus_dens)
-R['l_cbd'] = np.log(R.d_cbd + 1); R['l_rail'] = np.log(R.d_rail + 0.2); R['l_coast'] = np.log(R.d_coast.clip(lower=0) + 0.2)
-R['l_parcel'] = np.log(R.parcel_med)
-R['l_comm'] = np.log1p(R.comm_dens); R['l_park'] = np.log1p(R.parking_dens)   # log(1+x): many SAs have none
-R['w'] = R.n.clip(upper=50).astype(float)
-# unknown build year (12% of buildings) is its own category (0); before 2026-10-08 the clip merged it into the 1930s
-R['dec'] = np.where(R.yr.isna(), 0, (R.yr // 10 * 10).clip(1930, 2020)).astype(int)
-R['flb'] = pd.cut(R.fl.fillna(0), [-1, 0, 2, 4, 8, 15, 100], labels=['na', '1-2', '3-4', '5-8', '9-15', '16+']).astype(str)
-URB = ['l_junc', 'road_share', 'l_parcel', 'l_units', 'mix', 'comm_share', 'l_comm', 'l_park', 'circuity', 'l_bus',
-       'l_rail', 'l_cbd', 'l_coast']
-GRP = ['haredi', 'arab']                                # vote shares (Knesset 25), an alternative to the SES cluster
-for v in URB + GRP: R[v + '_z'] = (R[v] - np.average(R[v], weights=R.w)) / np.sqrt(np.cov(R[v], aweights=R.w))
-
-def wdemean(X, groups, w):
-    if groups is None: return X - np.average(X, axis=0, weights=w)
-    out = X.copy()
-    for gcol in groups:
-        gi = codes(gcol); sw = np.bincount(gi, w)
-        for _ in range(1):
-            m = np.vstack([np.bincount(gi, w*out[:, j])/sw for j in range(out.shape[1])]).T
-            out = out - m[gi]
-    return out
-def ols(df, xs, absorb=(), dummies=()):
-    """WLS of fe on xs (+ dummies), absorbing FE in `absorb` (alternating projections); SE clustered by SA."""
-    X = df[xs].astype(float).values
-    for d in dummies: X = np.c_[X, pd.get_dummies(df[d], drop_first=True, dtype=float).values]
-    y = df.fe.values[:, None]; w = df.w.values
-    sst = float((w*(df.fe.values - np.average(df.fe.values, weights=w))**2).sum())
-    M = np.c_[y, X]
-    gs = [df[a].values for a in absorb]
-    if gs:
-        for _ in range(30): M = wdemean(M, gs, w)
-    else: M = M - np.average(M, axis=0, weights=w)
-    y, X = M[:, 0], M[:, 1:]
-    sw = np.sqrt(w); Xw, yw = X*sw[:, None], y*sw
-    XtX = np.linalg.pinv(Xw.T @ Xw); b = XtX @ Xw.T @ yw; e = yw - Xw @ b
-    cl = codes(df.si.values); S = np.vstack([np.bincount(cl, Xw[:, j]*e) for j in range(X.shape[1])]).T
-    V = XtX @ (S.T @ S) @ XtX; G = cl.max()+1; V *= G/(G-1)
-    r2 = 1 - (e**2).sum()/sst                       # total R2 (absorbed FE count as explained)
-    r2w = 1 - (e**2).sum()/(yw**2).sum()             # within R2
-    k = len(xs)
-    return {'b': dict(zip(xs, np.round(b[:k], 4))), 'se': dict(zip(xs, np.round(np.sqrt(np.diag(V))[:k], 4))), 'r2': round(float(r2), 3), 'r2_within': round(float(r2w), 3), 'n': int(len(df))}
-
-Z = [v + '_z' for v in URB]
-res = {}
-res['m1_junc'] = ols(R, ['l_junc_z'])
-res['m2_urban'] = ols(R, Z)
-FORM = ['l_junc_z', 'road_share_z', 'l_parcel_z', 'l_units_z', 'mix_z', 'comm_share_z', 'l_comm_z', 'l_park_z', 'circuity_z', 'l_bus_z']
-LOC = ['l_rail_z', 'l_cbd_z', 'l_coast_z']
-res['m_form'] = ols(R, FORM)
-res['m_loc'] = ols(R, LOC)
-res['m_form_city'] = ols(R, FORM, absorb=['yishuv'])
-res['m3_ses'] = ols(R, Z, dummies=['ses21'])
-res['m4_city'] = ols(R, Z, absorb=['yishuv'], dummies=['ses21'])
-res['m5_bld'] = ols(R, Z, absorb=['yishuv'], dummies=['ses21', 'dec', 'flb'])
-res['m6_junc_city'] = ols(R, ['l_junc_z'], absorb=['yishuv'])
-res['m7_junc_city_ses'] = ols(R, ['l_junc_z'], absorb=['yishuv'], dummies=['ses21'])
-# vote shares as the group control, alone and with SES; all within city
-G = [g + '_z' for g in GRP]
-res['m8_city_votes'] = ols(R, Z + G, absorb=['yishuv'])
-res['m9_city_ses_votes'] = ols(R, Z + G, absorb=['yishuv'], dummies=['ses21'])
-res['r2_votes'] = ols(R, G)['r2']
-res['r2_ses_votes'] = ols(R, G, dummies=['ses21'])['r2']
-res['sd_grp'] = {v: float(np.sqrt(np.cov(R[v], aweights=R.w))) for v in GRP}
-# OSM vs cadastral, and the extra OSM network measures: one at a time (z-scored), on the sample
-# where all are defined: raw, within city, within city + SES
-Q = R[(R.junc_dens_cad > 0) & (R.junc_dens_walk > 0) & (R.street_dens > 0) & R.deadend_share.notna()
-      & R.fourway_share.notna() & R.orient_ent.notna()].copy()
-Q['l_junc_osm'] = np.log(Q.junc_dens); Q['l_junc_cad'] = np.log(Q.junc_dens_cad); Q['l_junc_walk'] = np.log(Q.junc_dens_walk)
-Q['l_street'] = np.log(Q.street_dens)
-NETV = ['l_junc_osm', 'l_junc_cad', 'l_junc_walk', 'l_street', 'deadend_share', 'fourway_share', 'orient_ent']
-for v in NETV: Q[v + '_z'] = (Q[v] - np.average(Q[v], weights=Q.w)) / np.sqrt(np.cov(Q[v], aweights=Q.w))
-def one(v):
-    r = [ols(Q, [v + '_z']), ols(Q, [v + '_z'], absorb=['yishuv']), ols(Q, [v + '_z'], absorb=['yishuv'], dummies=['ses21'])]
-    return {'b': [m['b'][v + '_z'] for m in r], 'se': [m['se'][v + '_z'] for m in r], 'sd': float(np.sqrt(np.cov(Q[v], aweights=Q.w)))}
-res['net_cmp'] = {v: one(v) for v in NETV}
-res['net_cmp_n'] = int(len(Q))
-res['net_all_city_ses'] = ols(Q, [v + '_z' for v in NETV], absorb=['yishuv'], dummies=['ses21'])
-# total explained: city dummies only, SA dummies only (ceiling for any SA-level measure)
-res['r2_city'] = ols(R.assign(one=0.0), ['one'], absorb=['yishuv'])['r2']
-res['r2_sa'] = ols(R.assign(one=0.0), ['one'], absorb=['si'])['r2']
-res['r2_ses'] = ols(R.assign(one=0.0), ['one'], dummies=['ses21'])['r2']
-res['sd_fe'] = float(np.sqrt(np.cov(R.fe, aweights=R.w)))
-res['sd_raw'] = {v: float(np.sqrt(np.cov(R[v], aweights=R.w))) for v in URB}
-
-# binned scatter: FE vs log intersection density, raw and within city (both residualised on city)
-def binsc(x, y, w, nb=20):
-    q = np.asarray(pd.qcut(x, nb, labels=False, duplicates='drop'))
-    return [[float(np.average(x[q == k], weights=w[q == k])), float(np.average(y[q == k], weights=w[q == k])), int((q == k).sum())] for k in range(q.max()+1)]
-res['bins_raw'] = binsc(R.l_junc.values, R.fe.values, R.w.values)
-Mw = wdemean(np.c_[R.l_junc.values, R.fe.values], [R.yishuv.values], R.w.values)
-res['bins_city'] = binsc(Mw[:, 0] + np.average(R.l_junc, weights=R.w), Mw[:, 1], R.w.values)
-
-# SA table for the page: SA-level mean FE and measures (urban SAs with >= 20 buildings with FE)
-S = R.groupby('si').apply(lambda d: pd.Series({'fe': np.average(d.fe, weights=d.w), 'nb': len(d)}))
-U = U.join(S, on='si')
-U.to_csv('sa_urban.csv', index=False)
-top = U[(U.nb >= 20)].copy()
-res['sa_corr'] = {v: round(float(np.corrcoef(top[v].astype(float), top.fe)[0, 1]), 3) for v in
-                  ['junc_dens', 'road_share', 'parcel_med', 'units_dens', 'pop_dens', 'mix', 'comm_share', 'bus_dens', 'school_dens']
-                  if top[v].notna().all()}
-res['n_sa'] = int(len(top)); res['n_sa_all'] = int(len(U))
-res['junc_dens_q'] = [round(float(x)) for x in U[U.units > 0].junc_dens.quantile([.1, .25, .5, .75, .9])]
-res['junc_dens_cad_q'] = [round(float(x)) for x in U[U.units > 0].junc_dens_cad.quantile([.1, .25, .5, .75, .9])]
-_k = U[(U.units > 0) & U.junc_dens_cad.notna()]
-res['sa_corr_osm_cad'] = round(float(np.corrcoef(np.log1p(_k.junc_dens), np.log1p(_k.junc_dens_cad))[0, 1]), 3)
-res['city_blk'] = (U[U.units > 0].groupby('name').apply(lambda d: pd.Series({
-        'junc_dens': np.average(d.junc_dens, weights=d.units), 'road_share': np.average(d.road_share, weights=d.units),
-        'units': d.units.sum(), 'fe': np.average(d.fe.fillna(d.fe.mean()), weights=d.units)}))
-        .query('units >= 20000').sort_values('junc_dens', ascending=False).round(3).reset_index().values.tolist())
-def clean(o):   # NaN is not valid JSON
-    if isinstance(o, dict): return {k: clean(v) for k, v in o.items()}
-    if isinstance(o, (list, tuple)): return [clean(v) for v in o]
-    if isinstance(o, (float, np.floating)): return None if not np.isfinite(o) else float(o)
-    if isinstance(o, np.integer): return int(o)
-    return o
-json.dump(clean(res), open('urban_v3.json', 'w'), ensure_ascii=False)
-for k, v in res.items(): print(k, json.dumps(v, ensure_ascii=False, default=float)[:600])
+B.to_pickle('urban_B.pkl'); U.to_pickle('urban_U.pkl')    # checkpoint: build_urban_reg.py starts here
+import runpy; runpy.run_path('build_urban_reg.py', run_name='__main__')

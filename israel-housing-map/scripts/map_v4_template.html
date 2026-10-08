@@ -190,13 +190,14 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
 
   <section id="varsec">
     <h2>כל משתנה על המפה: בחירת משתנה, שנה ויחידה</h2>
-    <p class="lede">כל משתנה שחושב, ברמת מחוז, נפה, עיר (יישוב לפי הלמ"ס) או אזור סטטיסטי. משתנים מבוססי עסקאות זמינים לכל שנת מכירה, 1998 עד 2026. ערך מוצג רק כשיש לפחות 5 עסקאות באזור סטטיסטי או 10 ביחידה גדולה יותר. משתנים קבועים (רשת רחובות, צפיפות, גיל המלאי ועוד) אינם תלויי שנה. הצבעים לפי שביעונים של כל השנים יחד, כך שאפשר להשוות בין שנים. לחיצה על עיר, נפה או מחוז פותחת את הכרטיס שלה.</p>
+    <p class="lede">כל משתנה שחושב, ברמת מחוז, נפה, עיר (יישוב לפי הלמ"ס) או אזור סטטיסטי. משתנים מבוססי עסקאות זמינים לכל שנת מכירה, 1998 עד 2026. ערך מוצג רק כשיש לפחות 5 עסקאות באזור סטטיסטי או 10 ביחידה גדולה יותר. משתנים קבועים (רשת רחובות, צפיפות, גיל המלאי ועוד) אינם תלויי שנה. הצבעים בסולם רציף בין האחוזון ה־2 ל־98 של כל השנים יחד, כך שאפשר להשוות בין שנים. ההגדרה והמקור של כל משתנה מופיעים מתחת לבחירה, וכולם יחד במילון המשתנים למטה. לחיצה על עיר, נפה או מחוז פותחת את הכרטיס שלה.</p>
     <div class="chips">
       <select id="vVar" aria-label="משתנה"></select>
       <select id="vLev" aria-label="יחידה"><option value="region">מחוז</option><option value="county">נפה</option><option value="city" selected>עיר</option><option value="sa">אזור סטטיסטי</option></select>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)">שנה <input type="range" id="vYear" min="1998" max="2026" value="2025" style="width:180px;accent-color:var(--btn)"><b id="vYearLab" style="color:var(--fg);min-width:3em">2025</b></label>
       <button class="chip" id="vPlay" aria-pressed="false">הנפשה</button>
     </div>
+    <p class="lede" id="vdef" style="font-size:13px;margin:6px 0 10px"></p>
     <div class="two" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">
       <div class="chart" style="padding:0;overflow:hidden;position:relative"><div id="vmap" style="height:560px" dir="ltr"></div><div class="legend" id="vleg" style="bottom:12px"></div></div>
       <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
@@ -328,12 +329,22 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     <p class="lede" id="urblede"></p>
     <div class="two">
       <div class="chart"><h3>אפקט הבניין מול צמתים לקמ"ר באזור הסטטיסטי (20 קבוצות שוות)</h3>
-        <div class="key"><span><i style="background:var(--nodata)"></i>כל הארץ</span><span><i style="background:var(--accent)"></i>בתוך אותה עיר</span></div>
+        <div class="key"><span><i style="background:var(--nodata)"></i>כל הארץ</span><span><i style="background:var(--accent)"></i>מול ממוצע העיר</span></div>
         <svg id="ubins" viewBox="0 0 560 260" role="img" aria-label="אפקט בניין מול צפיפות צמתים"></svg></div>
       <div class="chart"><h3>כמה מהשונות באפקט הבניין כל קבוצת משתנים מסבירה (R²)</h3>
         <svg id="uvar" viewBox="0 0 560 260" role="img" aria-label="שונות מוסברת"></svg></div>
     </div>
-    <div class="method"><b>איך זה חושב</b><div class="eq" dir="ltr">שלב 1: ln(<i>P</i>/m²)<sub><i>i</i></sub> = α<sub><i>b</i>(<i>i</i>)</sub> + τ<sub><i>t</i>(<i>i</i>)</sub> + κ<sub><i>a</i>(<i>i</i>)</sub> + ε<sub><i>i</i></sub>   →   α̂<sub><i>b</i></sub> = "אפקט הבניין"</div><div class="eq" dir="ltr">שלב 2: α̂<sub><i>b</i></sub> = <i>Z</i><sub><i>s</i>(<i>b</i>)</sub>′β + <i>L<sub>b</sub></i>′λ + μ<sub>city</sub> + Σ<sub><i>k</i></sub> 1[SES<sub><i>s</i></sub>=<i>k</i>] + <i>v<sub>b</sub></i>,   weight = min(<i>n<sub>b</sub></i>, 50)</div><p><i>Z</i> = מדדי צורה של האזור הסטטיסטי, כל אחד בסטיות תקן: צמתים לקמ"ר (OSM), שיעור שטח דרכים, גודל חלקה, דירות לקמ"ר, עירוב שימושים, שיעור מסחר בשימושי הקרקע, עסקים לקמ"ר (Overture, ביטחון 0.5 ומעלה, בלי מוסדות ציבור, דת, חינוך וטבע), חניונים וכניסות לחניון לקמ"ר (OSM), עקמומיות הרחובות (אורך רשת הנסיעה חלקי המרחק הישר בין צמתים) ותחנות אוטובוס. במודל "עיר + הצבעה", במקום אשכול SES נכנסים חלק הקולות ליהדות התורה ולש"ס ולמפלגות הערביות בכנסת 25, לפי האזור הסטטיסטי. <i>L</i> = מיקום: לוג המרחק לתחנת רכבת או רק"ל, למרכז תל אביב ולחוף. μ<sub>city</sub> = אפקט קבוע ליישוב, SES = אשכול חברתי־כלכלי 2021. רק בניינים עם 3 עסקאות לפחות. שגיאות התקן מקובצות לפי אזור סטטיסטי. האחוז המדווח הוא exp(β)−1 לסטיית תקן. R² בתרשים הימני: מה שמודל עם קבוצת המשתנים בלבד מסביר מהשונות של α̂<sub><i>b</i></sub>.</p></div>
+    <h3 style="margin-top:22px">מסחר ומחיר</h3>
+    <p class="lede" id="commlede"></p>
+    <div class="two">
+      <div class="chart"><h3>אפקט הבניין מול עסקים לקמ"ר באזור הסטטיסטי (20 קבוצות שוות)</h3>
+        <div class="key"><span><i style="background:var(--nodata)"></i>כל הארץ</span><span><i style="background:var(--accent)"></i>מול ממוצע העיר</span></div>
+        <svg id="ubins_comm" viewBox="0 0 560 260" role="img" aria-label="אפקט בניין מול צפיפות עסקים"></svg></div>
+      <div class="chart"><h3>אפקט הבניין מול שיעור המסחר בשימושי הקרקע (קבוצות שוות)</h3>
+        <div class="key"><span><i style="background:var(--nodata)"></i>כל הארץ</span><span><i style="background:var(--accent)"></i>מול ממוצע העיר</span></div>
+        <svg id="ubins_cshare" viewBox="0 0 560 260" role="img" aria-label="אפקט בניין מול שיעור מסחר"></svg></div>
+    </div>
+    <div class="method"><b>איך זה חושב</b><div class="eq" dir="ltr">שלב 1: ln(<i>P</i>/m²)<sub><i>i</i></sub> = α<sub><i>b</i>(<i>i</i>)</sub> + τ<sub><i>t</i>(<i>i</i>)</sub> + κ<sub><i>a</i>(<i>i</i>)</sub> + ε<sub><i>i</i></sub>   →   α̂<sub><i>b</i></sub> = "אפקט הבניין"</div><div class="eq" dir="ltr">שלב 2: α̂<sub><i>b</i></sub> = <i>Z</i><sub><i>s</i>(<i>b</i>)</sub>′β + <i>L<sub>b</sub></i>′λ + μ<sub>city</sub> + Σ<sub><i>k</i></sub> 1[SES<sub><i>s</i></sub>=<i>k</i>] + <i>v<sub>b</sub></i>,   weight = min(<i>n<sub>b</sub></i>, 50)</div><p><i>Z</i> = מדדי צורה של האזור הסטטיסטי, כל אחד בסטיות תקן: צמתים לקמ"ר (OSM), שיעור שטח דרכים, גודל חלקה, דירות לקמ"ר, עירוב שימושים, שיעור מסחר בשימושי הקרקע, עסקים לקמ"ר (Overture, ביטחון 0.5 ומעלה, בלי מוסדות ציבור, דת, חינוך וטבע), חניונים וכניסות לחניון לקמ"ר (OSM), עקמומיות הרחובות (אורך רשת הנסיעה חלקי המרחק הישר בין צמתים) ותחנות אוטובוס. במודל "עיר + הצבעה", במקום אשכול SES נכנסים חלק הקולות ליהדות התורה ולש"ס ולמפלגות הערביות בכנסת 25, לפי האזור הסטטיסטי. <i>L</i> = מיקום: לוג המרחק לתחנת רכבת או רק"ל, למרכז תל אביב ולחוף. μ<sub>city</sub> = אפקט קבוע ליישוב, SES = אשכול חברתי־כלכלי 2021. רק בניינים עם 3 עסקאות לפחות. בניין שחסר לו ערך באחד המשתנים (למשל שטח דרכים קדסטרי ביהודה ושומרון, שנת בנייה או מספר קומות) נשמט רק מהרגרסיות שבהן המשתנה נכנס, ולכן מספר התצפיות שונה בין המודלים. שגיאות התקן מקובצות לפי אזור סטטיסטי. משתנים בלוג נכנסים כלוג (β = גמישות), שיעורים ל־10 נקודות אחוז (מדווח exp(β)−1), ומדדים בלי יחידה טבעית מתוקננים (לסטיית תקן). עסקים, תחנות אוטובוס וחניונים: ln(x) כש־x > 0, ומשתנה דמי 1[x = 0] לאזורים בלי אף אחד, במקום ln(1+x) שתלוי ביחידות. מרחקים: ln(ק"מ + 0.2) לרכבת ולחוף ו־ln(ק"מ + 1) למרכז תל אביב. R² בתרשים הימני: מה שמודל עם קבוצת המשתנים בלבד מסביר מהשונות של α̂<sub><i>b</i></sub>.</p></div>
   </section>
 
   <section id="juncval">
@@ -346,7 +357,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     <p class="lede" style="font-size:13px">* Overture = השיטה שבשימוש בעמוד: צמתים של רשת הנסיעה ב־OSM, כפי שהיא מופצת ב־Overture Maps, באיחוד בסגנון OSMnx (רדיוס 10 מ'). "OSM 20 מ'" = נקודות שנמשכו ישירות מ־Overpass אחרי איחוד במרחק 20 מ'. "מגע", "מגע נקי" ו"שלד" = שלוש הגרסאות הקודמות, מהמפה הקדסטרית.</p>
     <h3 style="margin:16px 0 6px;font-size:1rem">מדדי רשת הרחובות מ־OSM ומחיר הבניין</h3>
     <p class="lede" id="netlede"></p>
-    <div class="tablewrap" style="max-height:none"><table style="font-size:13px"><thead><tr><th>מדד (אזור סטטיסטי)</th><th class="num">סטיית תקן</th><th class="num">כל הארץ</th><th class="num">בתוך העיר</th><th class="num">בתוך העיר + חברתי־כלכלי</th><th class="num">כולם יחד</th></tr></thead><tbody id="nettab"></tbody></table></div>
+    <div class="tablewrap" style="max-height:none"><table style="font-size:13px"><thead><tr><th>מדד (אזור סטטיסטי)</th><th>יחידה</th><th class="num">סטיית תקן</th><th class="num">כל הארץ</th><th class="num">בתוך העיר</th><th class="num">בתוך העיר + חברתי־כלכלי</th><th class="num">כולם יחד</th></tr></thead><tbody id="nettab"></tbody></table></div>
     <div class="method"><b>איך זה חושב</b><div class="eq" dir="ltr"><i>k</i>(<i>v</i>) = number of street-segment ends at node <i>v</i>,   intersections = {<i>v</i> : <i>k</i>(<i>v</i>) ≥ 3}, merged when ‖<i>v</i> − <i>w</i>‖ ≤ 20 m</div><div class="eq" dir="ltr">density<sub><i>s</i></sub> = intersections in <i>s</i> / urban km²<sub><i>s</i></sub></div><p>רשת הנסיעה של OSM (דרך Overture). מחבר באמצע קטע נספר פעמיים. שטח עירוני = סך שטח החלקות הקטנות מ־5 הקטאר באזור הסטטיסטי, וביהודה ושומרון השטח שבטווח 60 מ' מרחוב. בטבלת המדדים: אותו שלב 2 כמו למעלה, עם מדד אחד בכל פעם, על מדגם משותף.</p></div>
   </section>
 
@@ -354,8 +365,8 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     <div class="two">
       <div>
         <h2>האפקט של כל משתנה, בכמה מודלים</h2>
-        <p class="lede">אחוז השינוי במחיר הבניין למ"ר כשהמשתנה עולה בסטיית תקן אחת. מודגש = לפחות 2 שגיאות תקן מאפס (מקובצות לפי אזור סטטיסטי).</p>
-        <div class="tablewrap" style="max-height:none"><table style="font-size:13px"><thead><tr><th>משתנה</th><th class="num">צורה בלבד</th><th class="num">+ מיקום</th><th class="num">+ חברתי־כלכלי</th><th class="num">+ עיר</th><th class="num">+ גיל וגובה</th><th class="num">עיר + הצבעה (במקום SES)</th></tr></thead><tbody id="ucoef"></tbody></table></div>
+        <p class="lede">כל משתנה ביחידות הטבעיות שלו. משתנה בלוג: גמישות, כלומר אחוז השינוי במחיר הבניין לאחוז שינוי במשתנה (הכפלה של המשתנה = 2<sup>β</sup>−1). שיעור: אחוז השינוי במחיר כשהשיעור עולה ב־10 נקודות אחוז. מדד בלי יחידה טבעית (עירוב שימושים, עקמומיות): אחוז השינוי לסטיית תקן. עסקים, תחנות וחניונים: לוג למי שיש לו, ועוד משתנה דמי לאזורים בלי אף אחד (לא מוצג). מודגש = לפחות 2 שגיאות תקן מאפס (מקובצות לפי אזור סטטיסטי).</p>
+        <div class="tablewrap" style="max-height:none"><table style="font-size:13px"><thead><tr><th>משתנה</th><th>יחידה</th><th class="num">צורה בלבד</th><th class="num">+ מיקום</th><th class="num">+ חברתי־כלכלי</th><th class="num">+ עיר</th><th class="num">+ גיל וגובה</th><th class="num">עיר + הצבעה (במקום SES)</th></tr></thead><tbody id="ucoef"></tbody></table></div>
       </div>
       <div>
         <h2>צמתים לקמ"ר בערים הגדולות</h2>
@@ -462,6 +473,12 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     <div class="method"><b>איך זה חושב</b><div class="eq" dir="ltr">I<sub>area, t</sub>: equations (1)–(4) of the price-index section, estimated on the deals in the area</div><p>ארבעת המדדים מחושבים מחדש לכל אזור, חודשי ברמת הארץ והמחוז ורבעוני מתחת לזה. היסטוגרמות על קבוצות קבועות, אחידות לכל האזורים, עם ההתפלגות הארצית בקו מקווקו.</p></div>
   </section>
 
+  <section id="vardictsec">
+    <h2>מילון משתנים</h2>
+    <p class="lede">כל משתנה שמופיע בעמודים: הגדרה, יחידה, רמת מדידה, מקור, ואיך הוא נכנס לרגרסיות של צורה עירונית. "שטח עירוני" הוא המכנה של כל הצפיפויות. כללי חסרים: בניין שחסר לו ערך במשתנה נשמט רק מהרגרסיות שבהן המשתנה נכנס.</p>
+    <div class="tablewrap" style="max-height:600px"><table style="font-size:12.5px"><thead><tr><th>קבוצה</th><th>משתנה</th><th>הגדרה</th><th>יחידה</th><th>רמה</th><th>מקור</th><th>ברגרסיות</th></tr></thead><tbody id="vdbody"></tbody></table></div>
+  </section>
+
   <section id="sources">
     <h2>מקורות הנתונים</h2>
     <p class="lede">כל קבצי המקור, מאיפה הגיעו, מתי ומה נלקח מהם. המזהים מתייחסים ל"גרסאות לעם" (over.org.il), שמשמר עותקים של מאגרים ממשלתיים. אלא אם צוין אחרת, הנתונים הורדו ב־4–5 באוקטובר 2026.</p>
@@ -501,6 +518,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
 <!--REPORT--><script type="application/json" id="km-data">/*KM*/</script><!--/REPORT-->
 <!--REPORT--><script type="application/json" id="hed-data">/*HED*/</script><!--/REPORT-->
 <script type="application/json" id="areas-data">/*AREAS*/</script>
+<script type="application/json" id="vardict">/*VARDICT*/</script>
 <!--REPORT--><script type="application/json" id="iv-data">/*IV*/</script><!--/REPORT-->
 <!--REPORT--><script type="application/octet-stream" id="varmap">/*VARMAP*/</script><!--/REPORT-->
 <script type="application/json" id="land">/*LAND*/</script>
@@ -530,6 +548,8 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums">` +
     Array.from({ length: nt }, (_, k) => `<span>${f(scaleV(k/(nt-1), lo, hi, lg))}</span>`).join('') + `</div></div>`;
   const AR = J('areas-data'), AREA = Object.fromEntries(AR.areas.map(a => [a.key, a]));
+  const VD = J('vardict'), vdOf = k => VD.v[k] || VD.v[k.replace(/_pct$/, '')];
+  const vdText = k => { const e = vdOf(k); return e ? `${e.d} יחידה: ${e.u}. רמה: ${e.lv}. מקור: ${VD.src[e.s] || e.s}.` + (e.r ? ` ברגרסיות: ${e.r}` : '') : ''; };
   const normName = x => (x || '').replace(/[\s\-־–'"״׳*]/g, '');
   const AKEY = {}; AR.areas.forEach(a => { if (a.level === 'city') AKEY[normName(a.name)] = a.key; });
   const alink = name => { const k = AKEY[normName(name)]; return k ? `<button class="alink" data-area="${k}">${name.replace('*','')}</button>` : name.replace('*',''); };
@@ -978,20 +998,40 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       hover: v => { let best = null, bd = 1e9; for (const r of RS) { const d = Math.abs(r[0] - v); if (d < bd) { bd = d; best = r; } }
         return best && { x: best[0], text: `קנייה ב־${best[0]}: ${pct(best[1],1)} לשנה, ${pct(best[2])} הפסידו` }; } });
 
+  { const el = document.getElementById('vdbody'); if (el) {
+      const LBL = {}; (AR.hist_vars || []).forEach(h => LBL[h[0].replace(/_pct$/, '')] = h[1]);
+      el.innerHTML = Object.entries(VD.v).map(([k, e]) => `<tr><td>${e.g}</td><td><b>${VD.lab[k] || LBL[k] || k}</b><br><code style="font-size:11px;color:var(--muted)">${k}</code></td><td>${e.d}</td><td>${e.u}</td><td>${e.lv}</td><td>${VD.src[e.s] || e.s}</td><td>${e.r || '—'}</td></tr>`).join(''); } }
   // ---------- urbanism ----------
   const UR = J('urb-data');
   const pc = b => Math.exp(b) - 1, sg = v => (v >= 0 ? '+' : '') + (v*100).toFixed(1) + '%';
-  { const el = document.getElementById('ubins'), W = 560, H = 260, L0 = 46, R0 = 10, T0 = 14, B = 34;
-    const xs = [...UR.bins_raw, ...UR.bins_city].map(r => r[0]), x0 = Math.min(...xs) - 0.1, x1 = Math.max(...xs) + 0.1;
+  // coefficient in the variable's natural unit: log -> elasticity, share -> % per 10 pp, index -> % per SD
+  const UU = (UR.units || {}), unitOf = k => UU[k.replace(/_x$/, '')] || 'sd';
+  const ef = (k, b) => b == null ? '—' : unitOf(k) === 'log' ? (b >= 0 ? '+' : '−') + Math.abs(b).toFixed(3) : sg(pc(b));
+  const efse = (k, b, se) => b == null ? '—' : unitOf(k) === 'log' ? `${ef(k, b)} (${se.toFixed(3)})` : `${sg(pc(b))} (${(se*100).toFixed(1)})`;
+  const UNITLAB = { log: 'גמישות', '10pp': 'ל־10 נק"א', sd: 'לסטיית תקן' };
+  // binned scatter: building effect vs an SA measure, all of Israel (grey) and within city (accent)
+  const binChart = (id, raw, city, xlab, ticks, tx, lab) => { const el = document.getElementById(id), W = 560, H = 260, L0 = 46, R0 = 10, T0 = 14, B = 34;
+    const xs = [...raw, ...city].map(r => r[0]), pad = (Math.max(...xs) - Math.min(...xs))*0.04 || 0.1, x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad;
     const y0 = Math.log(0.76), y1 = Math.log(1.27);
     const x = v => L0 + (v - x0)/(x1 - x0)*(W - L0 - R0), y = v => H - B - (v - y0)/(y1 - y0)*(H - T0 - B);
     let s = '';
     for (const p of [-0.2,-0.1,0,0.1,0.2]) { const t = Math.log(1+p); s += `<line class="grid" x1="${L0}" x2="${W-R0}" y1="${y(t)}" y2="${y(t)}"${p===0?' style="stroke:var(--muted)"':''}></line><text x="${L0-6}" y="${y(t)+4}" text-anchor="end">${(p>0?'+':'') + Math.round(p*100)}%</text>`; }
-    for (const t of [10,25,50,100,200]) { const lx = Math.log(t); if (lx < x0 || lx > x1) continue; s += `<text x="${x(lx)}" y="${H-18}" text-anchor="middle">${t}</text>`; }
-    s += `<text x="${(W+L0)/2}" y="${H-2}" text-anchor="middle">צמתים לקמ"ר (סקאלה לוגריתמית)</text>`;
-    for (const [rows, cls, r] of [[UR.bins_raw, 'b', 4], [UR.bins_city, 'a', 4]])
-      for (const p of rows) s += `<circle class="${cls}" cx="${x(p[0])}" cy="${y(Math.max(y0, Math.min(y1, p[1])))}" r="${r}"><title>${Math.round(Math.exp(p[0]))} צמתים לקמ"ר: ${sg(pc(p[1]))} (${fmt(p[2])} בניינים)</title></circle>`;
-    el.innerHTML = s; }
+    for (const [t, l] of ticks) { const lx = tx(t); if (lx < x0 || lx > x1) continue; s += `<text x="${x(lx)}" y="${H-18}" text-anchor="middle">${l}</text>`; }
+    s += `<text x="${(W+L0)/2}" y="${H-2}" text-anchor="middle">${xlab}</text>`;
+    for (const [rows, cls] of [[raw, 'b'], [city, 'a']])
+      for (const p of rows) s += `<circle class="${cls}" cx="${x(p[0])}" cy="${y(Math.max(y0, Math.min(y1, p[1])))}" r="4"><title>${lab(p[0])}: ${sg(pc(p[1]))} (${fmt(p[2])} בניינים)</title></circle>`;
+    el.innerHTML = s; };
+  binChart('ubins', UR.bins_raw, UR.bins_city, 'צמתים לקמ"ר (סקאלה לוגריתמית)', [10,25,50,100,200].map(t => [t, t]), Math.log, v => `${Math.round(Math.exp(v))} צמתים לקמ"ר`);
+  if (UR.bins_comm) {
+    const BC = UR.bins_comm.l_comm, BS = UR.bins_comm.comm_share;
+    binChart('ubins_comm', BC.raw, BC.city, 'עסקים לקמ"ר (סקאלה לוגריתמית; בלי אזורים ללא עסקים)', [3,10,30,100,300,1000,3000].map(t => [t, fmt(t)]), Math.log, v => `${fmt(Math.round(Math.exp(v)))} עסקים לקמ"ר`);
+    binChart('ubins_cshare', BS.raw, BS.city, 'שיעור המסחר והמשרדים בשימושי הקרקע', [0,0.05,0.1,0.2,0.3,0.4,0.6,0.8].map(t => [t, Math.round(t*100) + '%']), v => v, v => `${(v*100).toFixed(1)}% מסחר`);
+    const MC = UR.m_comm, f = (m, k) => efse(k, m.b[k], m.se[k]), d2 = b => sg(Math.pow(2, b) - 1);
+    document.getElementById('commlede').textContent =
+      `עסקים הם מקומות עם רישום ציבורי ב־Overture (חנויות, מסעדות, משרדים ושירותים), לקמ"ר של שטח עירוני. שיעור המסחר הוא חלק התאים בגריד שימושי הקרקע של הלמ"ס שמסומנים כמסחר או מרכז עיר. `+
+      `גמישות המחיר לצפיפות העסקים בכל הארץ: ${f(MC.l_comm[0], 'l_comm_x')}, כלומר פי 2 עסקים לקמ"ר = ${d2(MC.l_comm[0].b.l_comm_x)} במחיר. בתוך אותה עיר ${f(MC.l_comm[1], 'l_comm_x')} (הכפלה: ${d2(MC.l_comm[1].b.l_comm_x)}), ועם אשכול חברתי־כלכלי ${f(MC.l_comm[2], 'l_comm_x')} (בסוגריים: שגיאת תקן). אזורים בלי אף עסק נכנסים עם משתנה דמי ולא מוצגים בתרשים. `+
+      `בתרשימים: ציר x בערכים האמיתיים, ובנקודות הכתומות מחיר הבניין מול הממוצע של העיר שלו. בתוך העיר הקשר הוא בעיקר מדרגה: אזורים בלי עסקים או עם מעט מאוד זולים, ומעבר לכך הקו כמעט שטוח. שיעור המסחר בשימושי הקרקע, ל־10 נקודות אחוז: ${f(MC.comm_share[0], 'comm_share_x')} בכל הארץ, ${f(MC.comm_share[1], 'comm_share_x')} בתוך העיר. `+
+      `${fmt(BC.n)} בניינים. מתאם, לא סיבתיות: עסקים נפתחים גם במקום שבו יש ביקוש ותושבים אמידים.`; }
   { const el = document.getElementById('uvar'), bars = [
       ['צורה עירונית (צמתים, צפיפות, עירוב, עסקים, חניה, עקמומיות, תחבורה)', UR.m_form.r2], ['מיקום (מרחק למרכז ת"א, לרכבת, לחוף)', UR.m_loc.r2],
       ['צורה + מיקום', UR.m2_urban.r2], ['אשכול חברתי־כלכלי בלבד', UR.r2_ses], ['צורה + מיקום + חברתי־כלכלי', UR.m3_ses.r2],
@@ -1002,27 +1042,28 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
         `<rect class="${i === bars.length - 1 ? 'b' : i === 0 ? 'w' : 'a'}" x="${W - labW - 8 - bw}" y="${yy + 4}" width="${bw}" height="16" rx="2"></rect>`+
         `<text class="v" x="${W - labW - 14 - bw}" y="${yy + 16}" style="direction:ltr;text-anchor:end">${Math.round(v*100)}%</text>`; });
     el.setAttribute('viewBox', `0 0 ${W} ${8 + bars.length*rowH}`); el.innerHTML = s; }
-  const ULAB = { l_junc_z:'צמתים לקמ"ר (לוג)', road_share_z:'שיעור שטח דרכים', l_parcel_z:'גודל חלקה (לוג)', l_units_z:'דירות לקמ"ר (לוג)',
-    l_comm_z:'עסקים לקמ"ר (לוג)', l_park_z:'חניונים לקמ"ר (לוג)', circuity_z:'עקמומיות הרחובות', haredi_z:'קולות למפלגות חרדיות', arab_z:'קולות למפלגות ערביות',
-    mix_z:'עירוב שימושים', comm_share_z:'שיעור מסחר ומשרדים', l_bus_z:'תחנות אוטובוס לקמ"ר (לוג)', l_rail_z:'מרחק לרכבת או רק"ל (לוג)',
-    l_cbd_z:'מרחק למרכז תל אביב (לוג)', l_coast_z:'מרחק לחוף (לוג)' };
+  const ULAB = { l_junc_x:'צמתים לקמ"ר (לוג)', road_share_x:'שיעור שטח דרכים', l_parcel_x:'גודל חלקה (לוג)', l_units_x:'דירות לקמ"ר (לוג)',
+    l_comm_x:'עסקים לקמ"ר (לוג)', l_park_x:'חניונים לקמ"ר (לוג)', circuity_x:'עקמומיות הרחובות', haredi_x:'קולות למפלגות חרדיות', arab_x:'קולות למפלגות ערביות',
+    mix_x:'עירוב שימושים', comm_share_x:'שיעור מסחר ומשרדים', l_bus_x:'תחנות אוטובוס לקמ"ר (לוג)', l_rail_x:'מרחק לרכבת או רק"ל (לוג)',
+    l_cbd_x:'מרחק למרכז תל אביב (לוג)', l_coast_x:'מרחק לחוף (לוג)' };
   const models = [UR.m_form, UR.m2_urban, UR.m3_ses, UR.m4_city, UR.m5_bld, UR.m8_city_votes];
-  document.getElementById('ucoef').innerHTML = Object.keys(ULAB).map(k => `<tr><td>${ULAB[k]}</td>` + models.map(m => {
+  document.getElementById('ucoef').innerHTML = Object.keys(ULAB).map(k => `<tr><td>${ULAB[k]}</td><td style="color:var(--muted);font-size:12px">${UNITLAB[unitOf(k)]}</td>` + models.map(m => {
       const b = m.b[k]; if (b == null) return '<td class="num">—</td>'; const t = Math.abs(b / m.se[k]);
-      return `<td class="num"${t >= 2 ? ' style="font-weight:700;color:var(--fg)"' : ' style="color:var(--muted)"'}>${sg(pc(b))}</td>`; }).join('') + '</tr>').join('') +
-    `<tr><td>R²</td>${models.map(m => `<td class="num">${m.r2.toFixed(2)}</td>`).join('')}</tr>`;
+      return `<td class="num"${t >= 2 ? ' style="font-weight:700;color:var(--fg)"' : ' style="color:var(--muted)"'}>${ef(k, b)}</td>`; }).join('') + '</tr>').join('') +
+    `<tr><td>R²</td><td></td>${models.map(m => `<td class="num">${m.r2.toFixed(2)}</td>`).join('')}</tr>` +
+    `<tr><td>בניינים</td><td></td>${models.map(m => `<td class="num">${fmt(m.n)}</td>`).join('')}</tr>`;
   const umax = Math.max(...UR.city_blk.map(r => r[1]));
   document.getElementById('ucity').innerHTML = UR.city_blk.map(([c,j,rs,u,fe]) => `<tr><td>${alink(c)}</td><td class="num">${Math.round(j)}<span class="bar" style="width:${Math.round(j/umax*44)}px"></span></td><td class="num">${pct(rs)}</td><td class="num">${fe == null || isNaN(fe) ? '—' : sg(pc(fe)).replace('.0','')}</td></tr>`).join('');
-  { const m1 = UR.m1_junc.b.l_junc_z, mc = UR.m6_junc_city.b.l_junc_z, mcs = UR.m7_junc_city_ses.b.l_junc_z, sd = UR.sd_raw.l_junc;
+  { const m1 = UR.m1_junc.b.l_junc_x, mc = UR.m6_junc_city.b.l_junc_x, mcs = UR.m7_junc_city_ses.b.l_junc_x, d2 = b => sg(Math.pow(2, b) - 1);
     document.getElementById('urblede').textContent =
       `רשת הרחובות היא מ־OpenStreetMap, כפי שהיא מופצת ב־Overture Maps (שכבת התחבורה, גרסה 2026-09-23). השרתים של OSM עצמם חסומים מהסביבה, אבל ספירת הצמתים זהה כמעט לגמרי לזו של Overpass (בדיקה למטה). צומת הוא נקודה שבה נפגשים 3 קטעי רחוב לפחות ברשת הנסיעה (בלי שבילים, מדרכות ודרכי שירות), כמו street_count ב־OSMnx. נקודות שהמעגלים שלהן ברדיוס 10 מ' חופפים מאוחדות לצומת אחד, כמו consolidate_intersections, כך שכיכר או צומת של כביש מופרד נספרים פעם אחת. הצפיפות מחושבת לכל אזור סטטיסטי, לקמ"ר של שטח עירוני (חלקות קטנות מ־5 הקטאר). האפקט הקבוע של בניין הוא המחיר הריאלי למ"ר של הבניין אחרי ניכוי אפקט החודש והשטח, מ־${fmt(UR.m1_junc.n)} בניינים עם 3 עסקאות לפחות. `+
-      `בכל הארץ, עלייה של סטיית תקן אחת בצמתים לקמ"ר (פי ${Math.exp(sd).toFixed(1)}) קשורה לשינוי של ${sg(pc(m1))} במחיר, כמעט אפס. כשמוסיפים מרחק למרכז תל אביב, לרכבת ולחוף, הקשר נעשה שלילי. בתוך אותה עיר הוא ${sg(pc(mc))}, כי שכונות ותיקות עם רשת צפופה זולות יותר, ואחרי פיקוח על מעמד חברתי־כלכלי הוא ${sg(pc(mcs))}. `+
+      `בכל הארץ, גמישות המחיר לצפיפות הצמתים היא ${m1.toFixed(3)}: אזור עם פי 2 צמתים לקמ"ר יקר ב־${d2(m1)}. כשמוסיפים מרחק למרכז תל אביב, לרכבת ולחוף, הקשר נעשה שלילי. בתוך אותה עיר הגמישות היא ${mc.toFixed(3)} (הכפלה: ${d2(mc)}), ואחרי פיקוח על מעמד חברתי־כלכלי ${mcs.toFixed(3)} (${d2(mcs)}). `+
       `האזור הסטטיסטי מסביר ${Math.round(UR.r2_sa*100)}% מהשונות במחיר הבניין, אבל צורת הרחוב עצמה מסבירה מעט: ${Math.round(UR.m_form.r2*100)}% בכל הארץ, ו־${Math.round(UR.m_form_city.r2_within*100)}% בתוך העיר.`; }
 
   { const JV = J('jval-data'), st = JV.stats, row = (lab, f) => `<tr><td>${lab}</td><td></td><td></td>` + ['ov','contact','contact_clean','skel'].map(k => `<td class="num">${f(st[k])}</td>`).join('') + '</tr>';
     document.getElementById('jvtab').innerHTML = JV.boxes.map(b => `<tr><td>${alink(b.city)}</td><td class="num">${b.osm_raw}</td><td class="num">${b.osm20}</td><td class="num"><b>${b.ov}</b></td><td class="num">${b.contact}</td><td class="num">${b.contact_clean}</td><td class="num">${b.skel}</td></tr>`).join('') +
       row('יחס ממוצע ל־OSM', x => x.ratio) + row('סטייה מוחלטת ממוצעת', x => pct(x.mape)) + row('מתאם עם OSM', x => x.corr);
-    const s31 = JV.stats31, NC = UR.net_cmp || {}, nb = (v, i) => NC[v] ? sg(pc(NC[v].b[i])) : '—';
+    const s31 = JV.stats31, NC = UR.net_cmp || {}, nb = (v, i) => NC[v] ? ef(v, NC[v].b[i]) : '—';
     document.getElementById('jvlede').textContent = `לבדיקה לקחתי קופסה של כקמ"ר אחד סביב המרכז (חציון משוקלל לפי דירות) של ${JV.boxes.length} ערים, ומשכתי מ־Overpass את כל הנקודות שבהן נפגשים 3 קטעי דרך לפחות (כבישים מ־motorway עד residential, וגם living_street ו־pedestrian), אחרי איחוד נקודות במרחק עד 20 מ'. הספירה מ־Overture, שבה משתמש העמוד, זהה כמעט לגמרי: יחס ממוצע ${st.ov.ratio}, סטייה של ${Math.round(st.ov.mape*100)}% בקופסה ומתאם ${st.ov.corr}. שלוש הגרסאות הקודמות, שנבנו מהמפה הקדסטרית, קרובות ל־OSM בממוצע (יחס ${st.skel.ratio} לשלד), אבל הסטייה בקופסה בודדת היא כ־${Math.round(st.skel.mape*100)}% והמתאם ${st.skel.corr}. ב־${s31.n} קופסאות המרכז של כל הערים הגדולות, המתאם בין השלד הקדסטרי ל־OSM הוא רק ${s31.corr}.`;
     document.getElementById('jvnotes').innerHTML = [
       '<b>ספירת יתר בקדסטר:</b> שבילי הולכי רגל ומעברים קצרים הם חלקות דרך. באילת השלד נותן פי 2 מ־OSM (שם הם footway או service). כך גם בכפר סבא, קריית גת ורמלה.',
@@ -1031,17 +1072,17 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       '<b>רשת הליכה:</b> כוללת גם מדרכות, מעברי חצייה, שבילים ומדרגות. במקומות שבהם מופו מדרכות ומעברי חצייה, יש בה פי 1.5–3 יותר צמתים מברשת הנסיעה, ולכן היא מודדת בעיקר את רמת המיפוי ב־OSM. היא מוצגת להשוואה בלבד.',
       `<b>ברמת האזור הסטטיסטי:</b> המתאם בין צפיפות הצמתים ב־OSM לזו של השלד הקדסטרי (בלוג) הוא רק ${UR.sa_corr_osm_cad}. הסדר בין הערים משתנה: כפר סבא, אילת וקריית גת יורדות הרבה, ואשדוד עולה.`,
       '<b>רף חיצוני:</b> תקן LEED-ND דורש לפחות 140 צמתים למייל רבוע, כ־54 לקמ"ר. העשירונים 10/25/50/75/90 של האזורים הסטטיסטיים עם דירות: ' + (UR.junc_dens_q||[]).join(', ') + ' (OSM), לעומת ' + (UR.junc_dens_cad_q||[]).join(', ') + ' בשלד הקדסטרי.',
-      `<b>הקשר למחיר:</b> בתוך העיר, ${nb('l_junc_osm',1)} לסטיית תקן בצמתים מ־OSM, לעומת ${nb('l_junc_cad',1)} בשלד הקדסטרי. אחרי פיקוח על מעמד חברתי־כלכלי: ${nb('l_junc_osm',2)} לעומת ${nb('l_junc_cad',2)}.`
+      `<b>הקשר למחיר:</b> בתוך העיר, גמישות של ${nb('l_junc_osm',1)} לצמתים מ־OSM, לעומת ${nb('l_junc_cad',1)} בשלד הקדסטרי. אחרי פיקוח על מעמד חברתי־כלכלי: ${nb('l_junc_osm',2)} לעומת ${nb('l_junc_cad',2)}.`
     ].map(t => `<li>${t}</li>`).join(''); }
 
   { const NC = UR.net_cmp || {}, ALL = UR.net_all_city_ses || {b:{},se:{}};
     const NL = { l_junc_osm:'צמתים לקמ"ר, OSM נסיעה (לוג)', l_junc_cad:'צמתים לקמ"ר, שלד קדסטרי (לוג)', l_junc_walk:'צמתים לקמ"ר, OSM הליכה (לוג)',
       l_street:'ק"מ רחוב לקמ"ר, OSM נסיעה (לוג)', deadend_share:'שיעור רחובות ללא מוצא', fourway_share:'שיעור צמתים של 4 רחובות ומעלה', orient_ent:'אנטרופיית כיווני הרחובות (1 = אקראי)' };
-    const cell = (b, se) => b == null ? '<td class="num">—</td>' : `<td class="num"${Math.abs(b/se) >= 2 ? ' style="font-weight:700;color:var(--fg)"' : ' style="color:var(--muted)"'}>${sg(pc(b))}</td>`;
+    const cell = (v, b, se) => b == null ? '<td class="num">—</td>' : `<td class="num"${Math.abs(b/se) >= 2 ? ' style="font-weight:700;color:var(--fg)"' : ' style="color:var(--muted)"'}>${ef(v, b)}</td>`;
     const lg = v => v.startsWith('l_');
-    document.getElementById('nettab').innerHTML = Object.keys(NL).filter(v => NC[v]).map(v => `<tr><td>${NL[v]}</td><td class="num">${lg(v) ? '×' + Math.exp(NC[v].sd).toFixed(2) : NC[v].sd.toFixed(2)}</td>` +
-      [0,1,2].map(i => cell(NC[v].b[i], NC[v].se[i])).join('') + cell(ALL.b[v + '_z'], ALL.se[v + '_z']) + '</tr>').join('');
-    document.getElementById('netlede').textContent = `אחוז השינוי באפקט הבניין כשהמדד עולה בסטיית תקן אחת. כל מדד נבדק לבד, על אותו מדגם (${fmt(UR.net_cmp_n || 0)} בניינים). בעמודה האחרונה כל המדדים יחד, בתוך העיר ועם מעמד חברתי־כלכלי. מודגש = לפחות 2 שגיאות תקן מאפס (מקובצות לפי אזור סטטיסטי). אנטרופיית הכיוונים לפי Boeing (2019): 0 = כל הרחובות בכיוון אחד, 1 = כל הכיוונים שווים. רשת משובצת מושלמת היא 0.39 בסולם הזה.`; }
+    document.getElementById('nettab').innerHTML = Object.keys(NL).filter(v => NC[v]).map(v => `<tr><td>${NL[v]}</td><td style="color:var(--muted);font-size:12px">${UNITLAB[unitOf(v)]}</td><td class="num">${lg(v) ? '×' + Math.exp(NC[v].sd).toFixed(2) : NC[v].sd.toFixed(2)}</td>` +
+      [0,1,2].map(i => cell(v, NC[v].b[i], NC[v].se[i])).join('') + cell(v, ALL.b[v + '_x'], ALL.se[v + '_x']) + '</tr>').join('');
+    document.getElementById('netlede').textContent = `מדדים בלוג: גמישות. שיעורים: אחוז השינוי באפקט הבניין ל־10 נקודות אחוז. אנטרופיה: לסטיית תקן. כל מדד נבדק לבד, על הבניינים שיש להם ערך שלו; העמודה האחרונה על ${fmt(UR.net_cmp_n || 0)} בניינים שיש להם את כולם. בעמודה האחרונה כל המדדים יחד, בתוך העיר ועם מעמד חברתי־כלכלי. מודגש = לפחות 2 שגיאות תקן מאפס (מקובצות לפי אזור סטטיסטי). אנטרופיית הכיוונים לפי Boeing (2019): 0 = כל הרחובות בכיוון אחד, 1 = כל הכיוונים שווים. רשת משובצת מושלמת היא 0.39 בסולם הזה.`; }
 
   // ---------- floor premium ----------
   const FL = J('floor-data');
@@ -1210,7 +1251,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     if (a.key !== 'IL') s += `<path class="nat" d="${nsh.map((v,i) => `${i ? 'L' : 'M'}${L0 + i*bw} ${y(v)} L${L0 + (i+1)*bw} ${y(v)}`).join(' ')}"></path>`;
     const mp = pos(med); if (mp != null) s += `<line class="md" x1="${mp}" x2="${mp}" y1="${T0}" y2="${H-B}"></line>`;
     [0, Math.floor(nb/2), nb].forEach(i => { s += `<text x="${L0 + i*bw}" y="${H - 6}" text-anchor="middle" style="direction:ltr">${fmtE(bins[i])}</text>`; });
-    return `<div class="hist"><h4>${lab}</h4><div class="meta">חציון ${med == null ? '—' : fmtE(med)} · ${fmt(nn)} ${fr === 'U' ? 'אזורים סטטיסטיים' : fr === 'G' ? 'גושים' : 'בניינים'}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lab}">${s}</svg></div>`; };
+    return `<div class="hist" title="${vdText(k).replace(/"/g, '&quot;')}"><h4>${lab} <span style="color:var(--muted);font-weight:400;cursor:help">ⓘ</span></h4><div class="meta">חציון ${med == null ? '—' : fmtE(med)} · ${fmt(nn)} ${fr === 'U' ? 'אזורים סטטיסטיים' : fr === 'G' ? 'גושים' : 'בניינים'}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lab}">${s}</svg></div>`; };
   const renderArea = (el, key, wide) => {
     const a = AREA[key]; if (!a) { el.innerHTML = ''; return; } const S = a.sum;
     const pctv = v => v == null ? '—' : (v >= 0 ? '+' : '') + Math.round(v*100) + '%';
@@ -1312,6 +1353,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     const render = () => {
       const v = VARS.find(z => z.k === vVar.value), lev = vLev.value, L_ = LV[lev], y = +vYear.value, yIdx = VM.years.indexOf(y);
       vYear.disabled = !v.yearly; vPlay.disabled = !v.yearly; vYearLab.textContent = v.yearly ? y : '—';
+      document.getElementById('vdef').textContent = vdText(v.k);
       const vals = valsFor(L_, v, yIdx).map((x, i) => okUnit(L_, i, v) ? x : null);
       const pool = v.yearly ? L_.yearly[v.k].flat() : vals;
       const pos = pool.filter(x => x != null && isFinite(x) && (!v.lg || x > 0)), lgS = v.lg && pos.length > 0;

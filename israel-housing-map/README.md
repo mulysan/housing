@@ -39,9 +39,18 @@ fetch_parcel_centroids → fetch_urban_layers → fetch_overture_roads → fetch
 → fetch_votes → fetch_sa2008 → geocode_parcels → build_prices → fetch_parcel_geoms
 → fetch_big_thin_parcels → fetch_govmap_deals → geocode_parcels → build_prices (again, with govmap)
 → fetch_gush_region → build_txn → build_floor → build_hedonic → build_iv → build_votes
-→ build_urban → val_summary → build_floor_groups → build_km → build_areas → build_varmap
+→ build_urban (runs build_urban_reg) → val_summary → build_floor_groups → build_km → build_areas → build_varmap
 → build_basemap_osm → build_page_v4 MAP_URL REPORT_URL
 ```
+
+`var_dict.py` is the variable dictionary (definition, unit, level, source and regression treatment of
+every variable on the pages); `build_varmap.py` and `build_areas.py` assert that each variable has an
+entry, and the analysis page shows it under each selector and as a full table.
+
+`build_urban_reg.py` (the regressions) can be rerun alone from the checkpoint `build_urban.py` writes.
+Missing values: a building is dropped only from regressions that use the missing variable. Log
+variables enter as logs (elasticities), shares per 10 points, unit-free indices per SD; counts with
+zeros enter as ln(x) plus a zero dummy.
 
 Every script starts with a header that states its inputs, outputs and each data decision
 (sample filters, thresholds, imputations, matching rules) with the reason for it.

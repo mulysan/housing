@@ -36,7 +36,7 @@ SA['cityname'] = SA.name.astype(str)
 
 # ---------- SA-level sums ----------
 S = pd.DataFrame(index=SA.sa)
-for c in ['urb_km2', 'road_km2', 'n_junc', 'n_junc_cad', 'n_junc_walk', 'street_km_drive', 'deadend_share', 'orient_ent', 'commerce', 'parking_n', 'parking_km2', 'circuity', 'haredi', 'arab', 'turnout', 'pop2015', 'lu_n', 'bus_stops', 'schools', 'ses21', 'parcel_med', 'mix', 'comm_share']:
+for c in ['urb_km2', 'road_km2', 'n_junc', 'n_junc_cad', 'n_junc_walk', 'street_km_drive', 'deadend_share', 'fourway_share', 'orient_ent', 'commerce', 'parking_n', 'parking_km2', 'circuity', 'haredi', 'arab', 'turnout', 'pop2015', 'lu_n', 'bus_stops', 'schools', 'ses21', 'parcel_med', 'mix', 'comm_share']:
     S[c] = U[c].reindex(S.index)
 S['comm_n'] = S.comm_share*S.lu_n
 b = B.dropna(subset=['sa'])
@@ -51,7 +51,7 @@ f = b[b.n >= 3]; S['fe_n'] = f.groupby('sa').n.sum(); S['fe_sum'] = f.assign(z=l
 v = b[b.unit_val.notna()]; S['val'] = v.assign(z=lambda d: d.unit_val*d.units).groupby('sa').z.sum(); S['uval'] = v.groupby('sa').units.sum()
 for c in ['d_cbd', 'd_rail', 'd_coast']:
     w = b[b[c].notna()]; S[c+'_s'] = w.assign(z=lambda d: d[c]*d.units).groupby('sa').z.sum(); S[c+'_u'] = w.groupby('sa').units.sum()
-S = S.fillna({k: 0 for k in S.columns if k not in ('ses21', 'parcel_med', 'mix', 'deadend_share', 'orient_ent', 'circuity', 'haredi', 'arab', 'turnout')})
+S = S.fillna({k: 0 for k in S.columns if k not in ('ses21', 'parcel_med', 'mix', 'deadend_share', 'fourway_share', 'orient_ent', 'circuity', 'haredi', 'arab', 'turnout')})
 S = S.join(SA.set_index('sa')[['city', 'county', 'region', 'cityname']])
 
 def agg(df):
@@ -69,6 +69,7 @@ def agg(df):
         'arab': np.average(df.arab[df.arab.notna()], weights=df.pop2015.fillna(0)[df.arab.notna()] + 1e-9) if df.arab.notna().any() else np.nan,
         'turnout': np.average(df.turnout[df.turnout.notna()], weights=df.pop2015.fillna(0)[df.turnout.notna()] + 1e-9) if df.turnout.notna().any() else np.nan,
         'deadend_share': np.average(df.deadend_share[df.deadend_share.notna()], weights=df.urb_km2[df.deadend_share.notna()]) if df.deadend_share.notna().any() else np.nan,
+        'fourway_share': np.average(df.fourway_share[df.fourway_share.notna()], weights=df.urb_km2[df.fourway_share.notna()]) if df.fourway_share.notna().any() else np.nan,
         'orient_ent': np.average(df.orient_ent[df.orient_ent.notna()], weights=df.street_km_drive[df.orient_ent.notna()] + 1e-9) if df.orient_ent.notna().any() else np.nan,
         'road_share': sd(df.road_km2.sum(), km), 'bus_dens': sd(df.bus_stops.sum(), km), 'school_dens': sd(df.schools.sum(), km),
         'parcel_med': np.average(df.parcel_med[df.parcel_med.notna()], weights=pm_w[df.parcel_med.notna()] + 1e-9) if df.parcel_med.notna().any() else np.nan,
@@ -85,7 +86,7 @@ STATIC = [  # key, label, unit, log scale for bins
   ('units', 'דירות רשומות', '', True), ('units_dens', 'דירות לקמ"ר', '', True), ('pop_dens', 'תושבים לקמ"ר (2015)', '', True),
   ('junc_dens', 'צמתים לקמ"ר (OSM, רשת נסיעה)', '', True), ('junc_dens_walk', 'צמתים לקמ"ר (OSM, רשת הליכה)', '', True),
   ('junc_dens_cad', 'צמתים לקמ"ר (קדסטר, השיטה הקודמת)', '', True), ('street_dens', 'ק"מ רחוב לקמ"ר (OSM)', '', True),
-  ('deadend_share', 'שיעור רחובות ללא מוצא (OSM)', '%', False),
+  ('deadend_share', 'שיעור רחובות ללא מוצא (OSM)', '%', False), ('fourway_share', 'שיעור צמתים של 4 רחובות ומעלה (OSM)', '%', False),
   ('comm_dens', 'עסקים לקמ"ר (Overture)', '', True), ('parking_dens', 'חניונים וכניסות לחניון לקמ"ר (OSM)', '', True),
   ('parking_share', 'שיעור השטח בחניונים ממופים', '%', False), ('circuity', 'עקמומיות רחובות (אורך / מרחק ישר)', '', False),
   ('haredi', 'קולות ליהדות התורה וש"ס (כנסת 25)', '%', False), ('arab', 'קולות למפלגות ערביות (כנסת 25)', '%', False), ('turnout', 'אחוז הצבעה (כנסת 25)', '%', False), ('orient_ent', 'אנטרופיית כיווני רחובות (0 = רשת, 1 = אקראי)', '', False), ('road_share', 'שיעור שטח דרכים', '%', False), ('bus_dens', 'תחנות אוטובוס לקמ"ר', '', True),
@@ -173,5 +174,8 @@ for k, bins in HB.items():
 txt = json.dumps(pack, ensure_ascii=False, separators=(',', ':'))
 b64 = base64.b64encode(gzip.compress(txt.encode(), 9)).decode()
 open('varmap.b64', 'w').write(b64)
-json.dump({'json_mb': round(len(txt)/1e6, 2), 'b64_mb': round(len(b64)/1e6, 2)}, open('varmap_info.json', 'w'))
+json.dump({'json_mb': round(len(txt)/1e6, 2), 'b64_mb': round(len(b64)/1e6, 2),
+           'labels': {k: l for k, l, *_ in STATIC + YEARLY}}, open('varmap_info.json', 'w'), ensure_ascii=False)
+# every variable must have a dictionary entry (var_dict.py)
+import var_dict; _miss = [k for k, *_ in STATIC + YEARLY if k not in var_dict.V]; assert not _miss, _miss
 print('json MB', round(len(txt)/1e6, 2), 'b64 MB', round(len(b64)/1e6, 2))
