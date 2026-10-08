@@ -6,7 +6,7 @@
 import duckdb, json, numpy as np, pandas as pd
 c = duckdb.connect('h.db', read_only=True)
 
-# ---- CPI: monthly CBS CPI from Shmuel's cpi.xlsx (columns date YYYY-MM, cpi), rebased to 2015=100.
+# ---- CPI: the CBS (הלמ"ס) monthly consumer price index, cpi.xlsx (columns date YYYY-MM, cpi), rebased to 2015=100.
 # Months after the last CPI month carry the last value forward.
 cx = pd.read_excel('cpi.xlsx'); cx['date'] = cx['date'].astype(str).str[:7]
 cs = cx.set_index('date').cpi
