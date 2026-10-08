@@ -41,7 +41,7 @@ fetch_parcel_centroids → fetch_urban_layers → fetch_overture_roads → fetch
 → fetch_votes → fetch_sa2008 → geocode_parcels → build_prices → fetch_parcel_geoms
 → fetch_big_thin_parcels → fetch_govmap_deals → geocode_parcels → build_prices (again, with govmap)
 → fetch_gush_region → build_txn → build_floor → build_hedonic → build_iv → build_votes
-→ build_urban (runs build_urban_reg) → val_summary → build_floor_groups → build_km → build_areas → build_varmap
+→ build_urban (runs build_urban_reg) → val_summary → build_floor_groups → build_km → build_km_grid → build_areas → build_varmap
 → build_basemap_osm → build_page_v4 MAP_URL REPORT_URL
 ```
 
