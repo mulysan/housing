@@ -442,6 +442,13 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
         <svg id="kmcity" viewBox="0 0 560 300" role="img" aria-label="שינוי במחיר מול שינוי בהיצע לפי עיר"></svg></div>
     </div>
     <div class="tablewrap" style="max-height:none;margin-top:12px"><table style="font-size:13px" id="kmtab"></table></div>
+    <h3 style="margin-top:22px">תקופות של 5 שנים, כמו תתי־התקופות במאמר המקורי</h3>
+    <p class="lede" id="km5lede"></p>
+    <div class="two">
+      <div class="chart"><h3>שינוי במחיר מול שינוי בהיצע בין תקופות עוקבות, לפי עיר</h3>
+        <svg id="km5sc" viewBox="0 0 560 300" role="img" aria-label="שינוי במחיר מול שינוי בהיצע בין תקופות"></svg></div>
+      <div class="tablewrap" style="max-height:none;min-width:0"><table style="font-size:13px" id="km5tab"></table></div>
+    </div>
     <div class="method"><b>איך זה חושב</b>
       <div class="eq" dir="ltr">ln <i>P<sub>jt</sub></i> = θ<sub><i>t</i></sub> + δ<sub><i>j</i></sub> + γ<sub><i>j</i></sub><i>t</i> − (1/σ)·ln <i>S</i><sub><i>j</i>,<i>t</i>−1</sub> + <i>u<sub>jt</sub></i></div>
       <div class="eq" dir="ltr"><i>N<sub>jt</sub></i> = Σ<sub><i>i</i>∈<i>j</i>, built≤<i>t</i></sub> 1,   <i>F<sub>jt</sub></i> = Σ m²<sub><i>i</i></sub>,   <i>E<sub>jt</sub></i> = Σ <i>v<sub>i</sub></i>/<i>v̄</i></div>
@@ -1158,6 +1165,17 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       `<tr>${'<th class="num">−1/σ (se)</th><th class="num">R² פנימי</th>'.repeat(3)}<th class="num">−1/σ (se)</th><th class="num">R² פנימי</th><th class="num">שיפוע (se)</th><th class="num">R²</th><th class="num">שיפוע (se)</th><th class="num">R²</th></tr></thead><tbody>` +
       W3.map(([w, lab]) => `<tr><td>${lab}</td>${cellm(M[w+'_fe'])}${cellm(M[w+'_trend'])}${cellm(M[w+'_fe_iv'])}${cellm(MT[w+'_fe'])}${cellc(T.long_diff[w])}${cellc(CR[w])}</tr>`).join('') + '</tbody>';
     const gc = C.growth_corr;
+    if (KM.p5) { const P5 = KM.p5, PC = P5.city.models, PT = P5.tier.models;
+      const pts5 = P5.city.pts.map(([m, p, x, y]) => [`${m} · ${P5.city.periods[p-1]}→${P5.city.periods[p]}`, x, y]);
+      scatter('km5sc', pts5, lf(pts5), { xlab:'שינוי בלוג מלאי הדירות בין תחילות התקופות', ylab:'שינוי במקדם המחיר בין התקופות (לוג)', r:3 });
+      const cl5 = m => `<td class="num"${star(m.b[0], m.se[0])}>${f3(m.b[0])} <span style="font-weight:400;color:var(--muted)">(${m.se[0].toFixed(3)})</span></td>`;
+      document.getElementById('km5tab').innerHTML = `<thead><tr><th>מדד ההיצע</th><th class="num">רמות: תקופה + עיר</th><th class="num">+ מגמה לעיר</th><th class="num">הפרשים: תקופה</th><th class="num">הפרשים + עיר</th><th class="num">הפרשים, IV</th><th class="num">אשכולות SES, הפרשים</th></tr></thead><tbody>` +
+        W3.map(([w, lab]) => `<tr><td>${lab}</td>${cl5(PC['lev_'+w])}${cl5(PC['levtr_'+w])}${cl5(PC['dif_'+w])}${cl5(PC['diftr_'+w])}${cl5(PC['dif_'+w+'_iv'])}${cl5(PT['dif_'+w])}</tr>`).join('') +
+        `<tr><td>R² פנימי, N מול E (הפרשים)</td><td colspan="6" class="num">${(PC.dif_n.r2_within*100).toFixed(1)}% מול ${(PC.dif_val.r2_within*100).toFixed(1)}%</td></tr></tbody>`;
+      document.getElementById('km5lede').textContent =
+        `Katz ו־Murphy (1992) אמדו את המודל של שתי הקבוצות על סדרה שנתית (1963–1987), ואת 64 הקבוצות המפורטות בחנו דרך שינויים בשלוש תתי־תקופות (1963–71, 1971–79, 1979–87). כאן: שנות המכירה בחמש תקופות (${P5.city.periods.join(', ')}), מקדם מחיר לכל עיר ותקופה ממודל אפקט קבוע לבניין, וההיצע הוא לוג המלאי בסוף השנה שלפני תחילת התקופה. `+
+        `בהפרשים בין תקופות עוקבות (${P5.city.n_mk} ערים, ${PC.dif_n.n} שינויים) המקדם של מספר הדירות הוא ${f3(PC.dif_n.b[0])} (${PC.dif_n.se[0]}), ועם מכשיר ה"חלק ההיסטורי" ${f3(PC.dif_n_iv.b[0])} (F = ${PC.dif_n_iv.first_stage_F}). כמו בנתונים השנתיים, אין שיפוע שלילי: ערים שבהן המלאי גדל יותר לא נעשו זולות יחסית. `+
+        `גם כאן היצע אפקטיבי לא מסביר יותר ממספר הדירות. בכל העמודות המספר הוא −1/σ; ערך חיובי אינו מתאים לעקומת ביקוש יורדת.`; }
     document.getElementById('kmlede').textContent =
       `לפי המודל, אם יחידות דיור בשווקים שונים הן תחליפים לא מושלמים, שוק שבו ההיצע גדל מהר יותר יראה עלייה איטית יותר במחיר היחסי, במקדם −1/σ. `+
       `בין ${C.n_mk} הערים הגדולות, ${C.years[0]}–${C.years[1]}, אין לכך תמיכה: בפיקוח על אפקט שנה ועיר המקדם ${f3(M.n_fe.b[0])} (לא מובהק), ועם מכשיר של חלק העיר בבנייה הארצית ב־1985–97 (F של שלב ראשון ${M.n_fe_iv.first_stage_F}) הוא ${f3(M.n_fe_iv.b[0])}. `+
@@ -1205,6 +1223,11 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       <p>הבנייה הארצית נקבעת בביקוש הארצי, שנספג באפקטי השנה. הזיהוי מגיע משווקים עם חלק היסטורי גדול בבנייה (עתודות קרקע, יכולת תכנון) שמקבלים חלק גדול יותר מכל גל ארצי. ההנחה היא שחלק הבנייה בתקופה הקודמת אינו קשור לזעזועי ביקוש יחסיים מאוחרים יותר, בהינתן אפקטי השוק (והמגמות). גל העלייה של שנות ה־90 מעורר ספק לגבי ערי פריפריה שבנו הרבה ב־1990–97, ולכן התוצאות מוצגות כרמז בלבד.</p>
       <h3>7. תוצאות: ${C.n_mk} ערים, ${C.years[0]}–${C.years[1]} (${fmt(C.n_obs)} תצפיות עיר×שנה)</h3>${tab(M)}
       <p>R² פנימי = החלק מהשונות במחיר שנשארת אחרי האפקטים הקבועים (והמגמות), שמוסבר על ידי ההיצע. שגיאות התקן מקובצות לפי עיר. המתאם בין הצמיחה השנתית של N ושל E בתוך עיר הוא ${gc.n_val}, ובין N ל־F ${gc.n_m2}. כמעט אין שונות שמבחינה ביניהם, ולכן ה־R² שלהם כמעט זהה.</p>
+      ${KM.p5 ? `<h3>7א. תקופות של 5 שנים</h3>
+      <p>זה הניתוח הקרוב ביותר לתתי־התקופות של Katz ו־Murphy. τ = ${KM.p5.city.periods.join(', ')}. מחיר: θ<sub>jτ</sub> = אפקט עיר×תקופה מאותה רגרסיה עם אפקט קבוע לבניין ולשטח מעוגל, מנורמל ל־0 ב־2013–17. היצע: ln S<sub>j</sub> בסוף השנה שלפני תחילת התקופה (1997, 2002, 2007, 2012, 2017). כל נתוני ההיצע הם לפני חיתוך פיגור הרישום, ולכן המחירים כאן ממשיכים עד 2022. רק ערים עם חמש התקופות.</p>
+      <div class="eq">רמות:   θ<sub>jτ</sub> = μ<sub>τ</sub> + δ<sub>j</sub> [+ γ<sub>j</sub>τ] − (1/σ) ln S<sub>jτ</sub> + u<sub>jτ</sub></div>
+      <div class="eq">הפרשים:   Δθ<sub>jτ</sub> = Δμ<sub>τ</sub> [+ γ<sub>j</sub>] − (1/σ) Δln S<sub>jτ</sub> + Δu<sub>jτ</sub></div>
+      <p>ערים, הפרשים: N ${f3(KM.p5.city.models.dif_n.b[0])} (${KM.p5.city.models.dif_n.se[0]}), F ${f3(KM.p5.city.models.dif_m2.b[0])} (${KM.p5.city.models.dif_m2.se[0]}), E ${f3(KM.p5.city.models.dif_val.b[0])} (${KM.p5.city.models.dif_val.se[0]}). IV: N ${f3(KM.p5.city.models.dif_n_iv.b[0])} (${KM.p5.city.models.dif_n_iv.se[0]}), F ראשון ${KM.p5.city.models.dif_n_iv.first_stage_F}. N ו־E יחד: N ${f3(KM.p5.city.models.dif_horse.b[0])}, E ${f3(KM.p5.city.models.dif_horse.b[1])}, אבל השניים כמעט זהים, ולכן הפיצול לא יציב. אשכולות SES, הפרשים: N ${f3(KM.p5.tier.models.dif_n.b[0])} (${KM.p5.tier.models.dif_n.se[0]}); עם מכשיר ${f3(KM.p5.tier.models.dif_n_iv.b[0])}, אבל המכשיר חלש (F = ${KM.p5.tier.models.dif_n_iv.first_stage_F}). שגיאות תקן מקובצות לפי שוק.</p>` : ''}
       <h3>8. תוצאות: 10 אשכולות SES (${fmt(T.n_obs)} תצפיות)</h3>${tab(MT)}
       <p>הפרש ארוך (שינוי במקדם השנה 2008→2020 מול שינוי בלוג ההיצע 2007→2019, בין האשכולות): N: ${f3(T.long_diff.n.b)} (${T.long_diff.n.se}), R² ${(T.long_diff.n.r2*100).toFixed(0)}%; F: ${f3(T.long_diff.m2.b)}, R² ${(T.long_diff.m2.r2*100).toFixed(0)}%; E: ${f3(T.long_diff.val.b)}, R² ${(T.long_diff.val.r2*100).toFixed(0)}%. ההיצע גדל מהר יותר באשכולות 7–9 (שכונות חדשות), והמחירים עלו שם פחות. אבל זה גם דפוס של התכנסות: המחירים בשכונות הזולות עלו מהר יותר אחרי 2008. בפאנל עם מגמה לכל אשכול הקשר נעלם.</p>
       <h3>9. שני שווקים: ליבה מול שאר הארץ</h3>

@@ -263,6 +263,83 @@ T_tier = price_index(A, 'ses', min_n=100)
 out['tier'] = panel(T_tier, S_tier, 'אשכולות SES', Z_tier)
 T_core = price_index(A, 'core', min_n=100)
 out['core'] = two_group(T_core, S_core, 'core', 'rest')
+# ---------------- five-year periods (KM's sub-period changes) ----------------
+# Katz and Murphy fit the two-group model on annual data, and analyse the 64 detailed groups through
+# changes over three sub-periods (1963-71, 1971-79, 1979-87). The analogue here: sale years in 5-year
+# periods tau = 1998-2002, 2003-07, 2008-12, 2013-17, 2018-22. Price theta_j,tau = market x period FE
+# from the same building-FE regression (normalised to 0 in 2013-17 per market). Supply = log stock at
+# the end of the year before the period starts (1997, 2002, 2007, 2012, 2017): predetermined for the
+# period's prices, and all before the registration-lag cut-off (decision 2), which lets the price
+# sample run to 2022. Two estimators:
+#   levels:      theta_j,tau = mu_tau + delta_j [+ gamma_j tau] - (1/sigma) ln S_j,tau + u      (5 periods)
+#   differences: D theta_j,tau = D mu_tau [+ gamma_j] - (1/sigma) D ln S_j,tau + D u             (4 changes)
+# The difference form is KM's: price changes across sub-periods against supply changes, with common
+# period effects; market effects in the difference form are market-specific trends in levels.
+PER = [(1998, 2002), (2003, 2007), (2008, 2012), (2013, 2017), (2018, 2022)]
+PLAB = [f'{a}-{b % 100:02d}' for a, b in PER]
+A5 = c.sql("select gush, parcel, dt, ppm, area, y from a where y between 1998 and 2022").df()
+A5 = A5.merge(P[['gush', 'parcel', 'city', 'core', 'tier']], on=['gush', 'parcel'], how='inner').rename(columns={'tier': 'ses'})
+A5['ym'] = pd.to_datetime(A5.dt).dt.to_period('M').astype(str)
+A5['lp'] = np.log(A5.ppm / A5.ym.map(cs.reindex(sorted(A5.ym.unique())).ffill()))
+A5['bld'] = A5.gush.astype(np.int64)*100000 + A5.parcel
+A5['y_real'] = A5.y; A5['y'] = A5.y_real.map(lambda v: next(k for k, (a, b) in enumerate(PER) if a <= v <= b))   # period index 0..4
+S_city5 = stock(G[G.city.isin(CITIES)], 'city', yrs=range(1870, 2018)); S_tier5 = stock(G, 'tier', yrs=range(1870, 2018))
+S_nat5 = stock(G.assign(all='IL'), 'all', yrs=range(1870, 2018))['IL']
+def predicted5(S):
+    return {m: pd.DataFrame({w: d[w][1997] + (d[w][1997] - d[w][1984]) / (S_nat5[w][1997] - S_nat5[w][1984]) * (S_nat5[w] - S_nat5[w][1997])
+                             for w in ['n', 'm2', 'val']}) for m, d in S.items()}
+def five(A5, key, S, min_n):
+    d = A5[A5[key].notna()]
+    d = d[d.groupby('bld').bld.transform('size') >= 2]
+    cell = d[key].astype(str) + '|' + d.y.astype(str); ci, labs = pd.factorize(cell)
+    f = fe_solve(d.lp.values.astype(float), [ci, codes(d.bld), codes(d.area.round())])[0]
+    T = pd.DataFrame({'mk': [l.split('|')[0] for l in labs], 'p': [int(l.split('|')[1]) for l in labs], 'theta': f, 'n': np.bincount(ci)})
+    T = T[T.n >= min_n]; base = T[T.p == 3].set_index('mk').theta; T['theta'] = T.theta - T.mk.map(base)
+    T = T.dropna(subset=['theta'])
+    Z = predicted5(S)
+    for w in ['n', 'm2', 'val']:
+        T['lS_' + w] = [np.log(S[m][w][PER[p][0] - 1]) if m in S else np.nan for m, p in zip(T.mk, T.p)]
+        T['lZ_' + w] = [np.log(max(Z[m][w][PER[p][0] - 1], 1)) if m in Z else np.nan for m, p in zip(T.mk, T.p)]
+    T = T.dropna().sort_values(['mk', 'p']).reset_index(drop=True)
+    T = T[T.groupby('mk').p.transform('size') == len(PER)].reset_index(drop=True)      # balanced panel
+    def fit(D, xs, fe_cols, iv=None):
+        W = pd.concat([pd.get_dummies(D[c_], prefix=c_, dtype=float) for c_ in fe_cols if c_ != 'trend'] +
+                      ([pd.get_dummies(D.mk, prefix='tr', dtype=float).mul(D.p, axis=0)] if 'trend' in fe_cols else []), axis=1) if fe_cols else None
+        proj = (lambda v: v - W.values @ np.linalg.lstsq(W.values, v, rcond=None)[0]) if W is not None else (lambda v: v - v.mean())
+        y = proj(D.theta.values); X = np.column_stack([proj(D[x].values) for x in xs]); F = None
+        if iv:
+            Zm = np.column_stack([proj(D[z].values) for z in iv]); pi = np.linalg.lstsq(Zm, X, rcond=None)[0]; Xh = Zm @ pi
+            cl0 = codes(D.mk); u = X - Xh; ZtZ = np.linalg.pinv(Zm.T @ Zm); Sz = np.c_[np.bincount(cl0, Zm[:, 0]*u[:, 0])]
+            Vp = ZtZ @ (Sz.T @ Sz) @ ZtZ * (cl0.max()+1)/cl0.max(); F = round(float(pi[0, 0]**2 / Vp[0, 0]), 1)
+            b = np.linalg.lstsq(Xh, y, rcond=None)[0]; e = y - X @ b; Xs = Xh
+        else:
+            b = np.linalg.lstsq(X, y, rcond=None)[0]; e = y - X @ b; Xs = X
+        XtX = np.linalg.pinv(Xs.T @ Xs); cl = codes(D.mk); Sg = np.vstack([np.bincount(cl, Xs[:, k]*e) for k in range(Xs.shape[1])]).T
+        G_ = cl.max() + 1; V = XtX @ (Sg.T @ Sg) @ XtX * G_/(G_ - 1)
+        return {'b': [round(float(v), 4) for v in b], 'se': [round(float(v), 4) for v in np.sqrt(np.diag(V))],
+                'sigma': [round(float(-1/v), 2) if v < 0 else None for v in b], 'r2_within': round(float(1 - (e**2).sum()/(y**2).sum()), 4),
+                'first_stage_F': F, 'n': int(len(D))}
+    res = {'n_mk': int(T.mk.nunique()), 'periods': PLAB, 'models': {}}
+    D1 = T.copy()                                                         # first differences across periods
+    for col in ['theta'] + [f'l{a}_{w}' for a in 'SZ' for w in ['n', 'm2', 'val']]:
+        D1[col] = D1.groupby('mk')[col].diff()
+    D1 = D1.dropna().reset_index(drop=True)
+    for w in ['n', 'm2', 'val']:
+        res['models'][f'lev_{w}'] = fit(T, ['lS_' + w], ['p', 'mk'])
+        res['models'][f'levtr_{w}'] = fit(T, ['lS_' + w], ['p', 'mk', 'trend'])
+        res['models'][f'dif_{w}'] = fit(D1, ['lS_' + w], ['p'])
+        res['models'][f'diftr_{w}'] = fit(D1, ['lS_' + w], ['p', 'mk'])
+        res['models'][f'dif_{w}_iv'] = fit(D1, ['lS_' + w], ['p'], iv=['lZ_' + w])
+    res['models']['dif_horse'] = fit(D1, ['lS_n', 'lS_val'], ['p'])
+    # the KM picture: per-period cross-market scatter of price change vs supply change (units)
+    res['pts'] = [[m, int(p), round(float(a_), 4), round(float(b_), 4)] for m, p, a_, b_ in zip(D1.mk, D1.p, D1.lS_n, D1.theta)]
+    res['mean_dS'] = {PLAB[p]: round(float(g.lS_n.mean()), 4) for p, g in D1.groupby('p')}
+    res['mean_dP'] = {PLAB[p]: round(float(g.theta.mean()), 4) for p, g in D1.groupby('p')}
+    return res
+out['p5'] = {'city': five(A5, 'city', S_city5, 30), 'tier': five(A5, 'ses', S_tier5, 100)}
+for k, r in out['p5'].items():
+    print('5y', k, r['n_mk'])
+    for m, v in r['models'].items(): print('   ', m, v['b'], v['se'], 'sigma', v['sigma'], 'R2w', v['r2_within'], 'F', v['first_stage_F'], 'n', v['n'])
 # ---------------- cross-section in levels (2015) ----------------
 # Within a city over time the three supply measures grow almost identically (growth correlation ~0.995),
 # so they cannot differ in explanatory power there. They do differ across cities, in levels: a city of
