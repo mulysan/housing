@@ -19,7 +19,7 @@ def points():
       case when p.p_n>=3 then p.p_ppm end ppm_p, case when p.g_n>=5 then p.g_ppm end ppm_g, p.loc_ppm,
       coalesce(p.p_n1525,0) nd, coalesce(p.loc_q, 1) loc_q
       from 'parcels_v3.parquet' p where p.lat is not null order by p.lat""").df()
-    BF = pd.read_csv('bld_fe.csv')[['gush', 'parcel', 'si', 'fe', 'n']]
+    BF = pd.read_csv('bld_fe.csv')[['gush', 'parcel', 'si', 'fe', 'n', 'd_cbd', 'd_rail', 'd_coast']]
     BF = BF.merge(pd.read_csv('sa_urban.csv')[['si', 'junc_dens']], on='si', how='left')
     P = P.merge(BF, on=['gush', 'parcel'], how='left')
     G = c.sql("""select gush, case when n_15>=10 and n_25>=10 then chg end chg, case when n_1525>=10 then turn end turn
@@ -33,19 +33,50 @@ def points():
       'u': P.units.clip(upper=65535).astype('<u2'), 'p': P.parcel.clip(0, 65535).astype('<u2'),
       'g': P.gush.map(gi).astype('<u2'), 'c': P.city.map(ci).astype('<u2'),
       'pp': h(P.ppm_p), 'pg': h(P.ppm_g), 'pl': h(P.loc_ppm), 'nd': P.nd.clip(upper=65535).astype('<u2'),
-      'j': np.nan_to_num(P.junc_dens.round() + 1, nan=0).clip(0, 65535).astype('<u2'),
       'bf': np.where((P.n >= 3) & P.fe.notna(), np.round((P.fe.fillna(0).clip(-2.9, 3) + 3)*1000), 0).astype('<u2'),
       'f': P.fl.clip(0, 255).astype('u1'),
       'd': np.nan_to_num((P.yr//10 - 180).where(P.yr.between(1870, 2026)), nan=0).astype('u1'),
-      'q': P.loc_q.clip(1, 5).astype('u1'),           # location: 1 parcel polygon, 2 deal coordinates, 3 street, 4 gush, 5 locality
+      'q': P.loc_q.clip(1, 5).astype('u1'),
+      # SA row (index into the SA table + 1; 0 = no SA). Distances as 1-byte log codes:
+      # code = round(25*(ln km + 3)) + 1, i.e. 4% steps from 50 m to 400 km; 0 = missing
+      's': np.nan_to_num(P.si.where(P.loc_q <= 4) + 1, nan=0).clip(0, 65535).astype('<u2'),
+      **{f: np.nan_to_num(np.round(25*(np.log(P[c].clip(lower=0.05)) + 3)) + 1, nan=0).clip(0, 255).astype('u1')
+         for f, c in [('dc', 'd_cbd'), ('dr', 'd_rail'), ('ds', 'd_coast')]},           # location: 1 parcel polygon, 2 deal coordinates, 3 street, 4 gush, 5 locality
     }
     assert len(gl) < 65536 and len(cities) < 65536
     buf = b''; meta = {}
+    # 2-byte fields first: a Uint16Array view needs an even byte offset
+    arrs = dict(sorted(arrs.items(), key=lambda kv: np.asarray(kv[1]).dtype.itemsize, reverse=True))
     for k, a in arrs.items():
         a = np.asarray(a); meta[k] = [len(buf), a.dtype.str[-2:]]; buf += a.tobytes()
     gush = {'id': [int(g) for g in gl], 'chg': [None if np.isnan(v) else round(float(v), 3) for v in Gm.chg],
             'turn': [None if np.isnan(v) else round(float(v), 4) for v in Gm.turn]}
-    return ({'n': len(P), 'fields': meta, 'cities': cities}, base64.b64encode(gzip.compress(buf, 9)).decode(), gush, len(P))
+    return ({'n': len(P), 'fields': meta, 'cities': cities, 'sa': sa_table(P)}, base64.b64encode(gzip.compress(buf, 9)).decode(), gush, len(P))
+
+# SA variables for the parcel map: every SA-level variable of the variable dictionary, by SA row (si).
+# Colour bounds: 2nd and 98th percentiles over parcels with a value (so the scale reflects where
+# housing is); log scale for the variables the variable map draws on a log scale.
+SA_VARS = ['junc_dens', 'units_dens', 'pop_dens', 'junc_dens_walk', 'junc_dens_cad', 'street_dens', 'deadend_share', 'fourway_share',
+           'orient_ent', 'circuity', 'road_share', 'parcel_med', 'mix', 'comm_share', 'comm_dens', 'parking_dens',
+           'parking_share', 'bus_dens', 'school_dens', 'ses21', 'haredi', 'arab', 'turnout']
+SHARE = {'deadend_share', 'fourway_share', 'road_share', 'comm_share', 'parking_share', 'haredi', 'arab', 'turnout'}
+LOGV = {'units_dens', 'pop_dens', 'junc_dens_walk', 'junc_dens_cad', 'street_dens', 'parcel_med', 'comm_dens', 'parking_dens', 'bus_dens', 'school_dens'}
+def sig(x, k=4):
+    return None if x is None or not np.isfinite(x) else float(f'{x:.{k}g}')
+def sa_table(P):
+    U = pd.read_csv('sa_urban.csv').set_index('si')
+    nsi = int(U.index.max()) + 1
+    lab = json.load(open('varmap_info.json')).get('labels', {})
+    out = {'vars': []}
+    for v in SA_VARS:
+        col = U[v].reindex(range(nsi))
+        pv = P.si.where(P.loc_q <= 4).map(U[v]).dropna()
+        lg = v in LOGV
+        if lg: pv = pv[pv > 0]
+        lo, hi = (float(pv.quantile(.02)), float(pv.quantile(.98))) if len(pv) else (0, 1)
+        out['vars'].append({'k': v, 'lab': lab.get(v, v), 'share': v in SHARE, 'lg': lg, 'lo': sig(lo, 3), 'hi': sig(hi, 3),
+                            'x': [sig(x) for x in col.values]})
+    return out
 
 if LIVE and not os.path.exists('parcels_v3.parquet'):
     meta, pts, gush, npts = json.loads(live_block('meta')), live_block('pts'), json.loads(live_block('gush')), None

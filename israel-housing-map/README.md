@@ -7,7 +7,9 @@ their own.
 
 Two published pages are built from the same data:
 
-- **Map** (`housing_map.html`): every residential gush-parcel as a point, coloured by price per m²,
+- **Map** (`housing_map.html`): every residential gush-parcel as a point, coloured by price per m², by any
+  statistical-area variable of the dictionary (businesses, parking, votes, street network, SES …), by
+  distance to the CBD, rail or coast,
   price change, turnover, height, vintage, renewal feasibility, OSM intersection density or
   building fixed effect, with a side panel per district, subdistrict and city. The street
   background is OpenStreetMap, served as small tiles next to the page (`roads/`).
