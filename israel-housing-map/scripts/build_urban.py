@@ -291,7 +291,8 @@ R['l_cbd'] = np.log(R.d_cbd + 1); R['l_rail'] = np.log(R.d_rail + 0.2); R['l_coa
 R['l_parcel'] = np.log(R.parcel_med)
 R['l_comm'] = np.log1p(R.comm_dens); R['l_park'] = np.log1p(R.parking_dens)   # log(1+x): many SAs have none
 R['w'] = R.n.clip(upper=50).astype(float)
-R['dec'] = (R.yr // 10 * 10).fillna(0).astype(int).clip(1930, 2020)
+# unknown build year (12% of buildings) is its own category (0); before 2026-10-08 the clip merged it into the 1930s
+R['dec'] = np.where(R.yr.isna(), 0, (R.yr // 10 * 10).clip(1930, 2020)).astype(int)
 R['flb'] = pd.cut(R.fl.fillna(0), [-1, 0, 2, 4, 8, 15, 100], labels=['na', '1-2', '3-4', '5-8', '9-15', '16+']).astype(str)
 URB = ['l_junc', 'road_share', 'l_parcel', 'l_units', 'mix', 'comm_share', 'l_comm', 'l_park', 'circuity', 'l_bus',
        'l_rail', 'l_cbd', 'l_coast']
