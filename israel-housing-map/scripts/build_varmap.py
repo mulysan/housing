@@ -36,7 +36,7 @@ SA['cityname'] = SA.name.astype(str)
 
 # ---------- SA-level sums ----------
 S = pd.DataFrame(index=SA.sa)
-for c in ['urb_km2', 'road_km2', 'n_junc', 'n_junc_cad', 'n_junc_walk', 'street_km_drive', 'deadend_share', 'orient_ent', 'pop2015', 'lu_n', 'bus_stops', 'schools', 'ses21', 'parcel_med', 'mix', 'comm_share']:
+for c in ['urb_km2', 'road_km2', 'n_junc', 'n_junc_cad', 'n_junc_walk', 'street_km_drive', 'deadend_share', 'orient_ent', 'commerce', 'parking_n', 'parking_km2', 'circuity', 'haredi', 'arab', 'turnout', 'pop2015', 'lu_n', 'bus_stops', 'schools', 'ses21', 'parcel_med', 'mix', 'comm_share']:
     S[c] = U[c].reindex(S.index)
 S['comm_n'] = S.comm_share*S.lu_n
 b = B.dropna(subset=['sa'])
@@ -51,7 +51,7 @@ f = b[b.n >= 3]; S['fe_n'] = f.groupby('sa').n.sum(); S['fe_sum'] = f.assign(z=l
 v = b[b.unit_val.notna()]; S['val'] = v.assign(z=lambda d: d.unit_val*d.units).groupby('sa').z.sum(); S['uval'] = v.groupby('sa').units.sum()
 for c in ['d_cbd', 'd_rail', 'd_coast']:
     w = b[b[c].notna()]; S[c+'_s'] = w.assign(z=lambda d: d[c]*d.units).groupby('sa').z.sum(); S[c+'_u'] = w.groupby('sa').units.sum()
-S = S.fillna({k: 0 for k in S.columns if k not in ('ses21', 'parcel_med', 'mix', 'deadend_share', 'orient_ent')})
+S = S.fillna({k: 0 for k in S.columns if k not in ('ses21', 'parcel_med', 'mix', 'deadend_share', 'orient_ent', 'circuity', 'haredi', 'arab', 'turnout')})
 S = S.join(SA.set_index('sa')[['city', 'county', 'region', 'cityname']])
 
 def agg(df):
@@ -62,6 +62,12 @@ def agg(df):
     return {
         'units': u, 'units_dens': sd(u, km), 'pop_dens': sd(df.pop2015.fillna(0).sum(), km), 'junc_dens': sd(df.n_junc.sum(), km),
         'junc_dens_walk': sd(df.n_junc_walk.sum(), km), 'junc_dens_cad': sd(df.n_junc_cad.sum(), km), 'street_dens': sd(df.street_km_drive.sum(), km),
+        'comm_dens': sd(df.commerce.sum(), km), 'parking_dens': sd(df.parking_n.sum(), km), 'parking_share': sd(df.parking_km2.sum(), km),
+        # SA-level ratios aggregated with the natural weights: circuity by street length, vote shares by population (2015)
+        'circuity': np.average(df.circuity[df.circuity.notna()], weights=df.street_km_drive[df.circuity.notna()] + 1e-9) if df.circuity.notna().any() else np.nan,
+        'haredi': np.average(df.haredi[df.haredi.notna()], weights=df.pop2015.fillna(0)[df.haredi.notna()] + 1e-9) if df.haredi.notna().any() else np.nan,
+        'arab': np.average(df.arab[df.arab.notna()], weights=df.pop2015.fillna(0)[df.arab.notna()] + 1e-9) if df.arab.notna().any() else np.nan,
+        'turnout': np.average(df.turnout[df.turnout.notna()], weights=df.pop2015.fillna(0)[df.turnout.notna()] + 1e-9) if df.turnout.notna().any() else np.nan,
         'deadend_share': np.average(df.deadend_share[df.deadend_share.notna()], weights=df.urb_km2[df.deadend_share.notna()]) if df.deadend_share.notna().any() else np.nan,
         'orient_ent': np.average(df.orient_ent[df.orient_ent.notna()], weights=df.street_km_drive[df.orient_ent.notna()] + 1e-9) if df.orient_ent.notna().any() else np.nan,
         'road_share': sd(df.road_km2.sum(), km), 'bus_dens': sd(df.bus_stops.sum(), km), 'school_dens': sd(df.schools.sum(), km),
@@ -79,7 +85,10 @@ STATIC = [  # key, label, unit, log scale for bins
   ('units', 'דירות רשומות', '', True), ('units_dens', 'דירות לקמ"ר', '', True), ('pop_dens', 'תושבים לקמ"ר (2015)', '', True),
   ('junc_dens', 'צמתים לקמ"ר (OSM, רשת נסיעה)', '', True), ('junc_dens_walk', 'צמתים לקמ"ר (OSM, רשת הליכה)', '', True),
   ('junc_dens_cad', 'צמתים לקמ"ר (קדסטר, השיטה הקודמת)', '', True), ('street_dens', 'ק"מ רחוב לקמ"ר (OSM)', '', True),
-  ('deadend_share', 'שיעור רחובות ללא מוצא (OSM)', '%', False), ('orient_ent', 'אנטרופיית כיווני רחובות (0 = רשת, 1 = אקראי)', '', False), ('road_share', 'שיעור שטח דרכים', '%', False), ('bus_dens', 'תחנות אוטובוס לקמ"ר', '', True),
+  ('deadend_share', 'שיעור רחובות ללא מוצא (OSM)', '%', False),
+  ('comm_dens', 'עסקים לקמ"ר (Overture)', '', True), ('parking_dens', 'חניונים וכניסות לחניון לקמ"ר (OSM)', '', True),
+  ('parking_share', 'שיעור השטח בחניונים ממופים', '%', False), ('circuity', 'עקמומיות רחובות (אורך / מרחק ישר)', '', False),
+  ('haredi', 'קולות ליהדות התורה וש"ס (כנסת 25)', '%', False), ('arab', 'קולות למפלגות ערביות (כנסת 25)', '%', False), ('turnout', 'אחוז הצבעה (כנסת 25)', '%', False), ('orient_ent', 'אנטרופיית כיווני רחובות (0 = רשת, 1 = אקראי)', '', False), ('road_share', 'שיעור שטח דרכים', '%', False), ('bus_dens', 'תחנות אוטובוס לקמ"ר', '', True),
   ('school_dens', 'מוסדות חינוך לקמ"ר', '', True), ('parcel_med', 'גודל חלקה חציוני (מ"ר)', '', True), ('mix', 'עירוב שימושים (0–1)', '', False),
   ('comm_share', 'שיעור מסחר ומשרדים', '%', False), ('ses21', 'אשכול חברתי־כלכלי 2021', '', False), ('fl_mean', 'קומות בבניין (ממוצע)', '', False),
   ('share_9', 'דירות בבניינים של 9+ קומות', '%', False), ('yr_mean', 'שנת בנייה (ממוצע משוקלל)', '', False), ('pre1980', 'דירות בבניינים מלפני 1980', '%', False),

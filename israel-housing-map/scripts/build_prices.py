@@ -1,4 +1,35 @@
-# Prices, turnover, hedonic, effective supply, renewal economics, stock value.
+# Core tables for the whole project: deals, gazetteer dwellings, parcel locations; plus the first
+# descriptive results (price levels and changes, turnover, height hedonic, effective supply, renewal,
+# stock value).
+#
+# DATA DECISIONS
+# Deals (table d, then a):
+#  - Source: the Tax Authority (רשות המסים, nadlan.taxes.gov.il) deal archive as kept by over.org.il
+#    (dataset fd06f5ae-..., 3,844,200 rows, 1998 - Sept 2026). The archive stores rows from several
+#    scrapes of the same deal; a deal is identified by (gush, parcel, sub-parcel, date, price) and
+#    duplicates are dropped (3.22M remain).
+#  - Judea and Samaria: the archive has almost no deals there. For gushim with no Tax Authority deal at
+#    all, govmap's deal layer (nadlan.gov.il) is used instead (src = 'govmap'); govmap has no "portion
+#    sold" field, so these are assumed to be whole-unit sales, and has no building year.
+#  - Apartment sample (table a): deal types דירה בבית קומות, ד. מגורים, דירת גן, דירת גג (flats,
+#    residential units, garden and roof flats; excludes houses, commercial, land, parking, storage);
+#    whole-unit sales only (portion = 1; partial sales are inheritance and divorce transfers whose
+#    price is not a market price for the unit); 25-400 m2 (below: studios / data errors; above:
+#    whole-building or mis-recorded areas); price >= 150,000 NIS (below: non-market transfers, in all
+#    years of the sample); price per m2 between 1,500 and 150,000 NIS (outside: recording errors in
+#    price or area). 1.68M Tax Authority + 51K govmap sales remain.
+#  - Prices are nominal here; real prices (CPI, 2015 = 100) are computed where needed (build_txn.py,
+#    build_hedonic.py, ...).
+# Dwellings (table g, p):
+#  - National assets gazetteer (Survey of Israel, free version, 2024-25 snapshot): asset types דירת
+#    מגורים and דירת מגורים חדשה = registered residential condominium units (2.68M). Parcel table p:
+#    units, highest floor count, median building year (years outside 1870-2026 treated as missing),
+#    modal settlement name.
+# Parcel locations (table cen):
+#  - Point inside the parcel polygon (ST_PointOnSurface) from the Survey of Israel parcel layer;
+#    for parcels with no polygon (Judea and Samaria, re-parcelled ones) the location from
+#    geocode_parcels.py (loc_q 2-5, see there).
+#
 # Inputs in cwd: gazetteer.csv, deals.csv (over.org.il download.csv of dataset
 # fd06f5ae-...), govmap_deals.csv (optional, fetch_govmap_deals.py), parcel_centroids.csv (fetch_parcel_centroids.py), parcel_geocoded.csv
 # (geocode_parcels.py; optional).

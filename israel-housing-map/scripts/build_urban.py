@@ -1,13 +1,38 @@
 # Urban form per CBS statistical area (2011) and how much of the building
 # price premium (building fixed effect) it accounts for.
 #
-# Street grid: OpenStreetMap via Overture Maps (osm_streets.py, fetch_overture_roads.py;
-# overpass-api.de and Geofabrik are unreachable from the container). Main measure: drive-network
-# intersections (street count >= 3) consolidated OSMnx-style at 10 m, per km2 of urban land.
-# Also: walk-network intersections, street length, dead-end and 4-way shares, orientation entropy.
-# The earlier cadastral measure (road parcels flagged by shape, skeleton junctions; roads.py,
-# junctions.py) is kept as junc_dens_cad for comparison. (A first try with block density - merging
-# non-road parcels into blocks - failed: one missed street merges a neighbourhood.)
+# UNIT. CBS statistical areas of 2011 (3,187; the unit with SES and population data). Every building
+# gets the values of the SA its parcel location falls in.
+# DENOMINATOR. "Urban land" = total area of the SA's cadastral parcels smaller than 5 ha (streets,
+# residential, commercial and public parcels; excludes farmland, forest and large open parcels, so
+# that SAs with a built core and a large rural fringe are not diluted). Where the cadastre has no
+# parcels (Judea and Samaria) it is the SA area within 60 m of a drivable/service OSM street, scaled
+# by 1.04, the median ratio of the two in well-covered Israeli SAs. SAs with < 0.02 km2 are dropped.
+#
+# MEASURES (per km2 of urban land unless stated):
+#  Street network - OpenStreetMap via Overture Maps (osm_streets.py, fetch_overture_roads.py;
+#   overpass-api.de and Geofabrik are unreachable from the container). Main measure: drive-network
+#   intersections (street count >= 3) consolidated OSMnx-style at 10 m. Also: walk-network
+#   intersections, km of street, dead-end and 4-way shares, orientation entropy, circuity (curvature).
+#   The earlier cadastral measure (road parcels flagged by shape, skeleton junctions; roads.py,
+#   junctions.py) is kept as junc_dens_cad for comparison. (A first try with block density - merging
+#   non-road parcels into blocks - failed: one missed street merges a neighbourhood.)
+#  Road share - area of road parcels / urban land (cadastre; missing where there is no cadastre).
+#  Parcel size - median area of non-road parcels under 5 ha (cadastre).
+#  Dwelling density - registered units (gazetteer) / urban land; population 2015 (CBS) / urban land.
+#  Land-use mix - normalised entropy of the CBS 2014 land-use grid (100 m cells, built-up uses);
+#   commercial share = share of cells in commerce / town-centre uses.
+#  Commerce - businesses with a public listing (Overture places, confidence >= 0.5, see below).
+#  Parking - OSM parking lots, structures and garage entrances; share of land in mapped lots.
+#  Transport - bus stops (GTFS), rail and light-rail stations within 1 km; building-level distance to
+#   the nearest station, to the Tel Aviv CBD (Azrieli) and to the coast.
+#  Schools - education institutions (Ministry of Education, govmap layer 18).
+#  Social - CBS socio-economic cluster 2021; Knesset 25 vote shares (build_votes.py).
+#
+# BUILDING PREMIUM. ln(price per m2 / CPI) = building FE + month FE + rounded-m2 FE on all apartment
+# deals (table a); the building FE (fe) is the price level of a building net of time and unit size.
+# Regressions use buildings with >= 3 deals, weights min(deals, 50) (so a few large projects do not
+# dominate), SEs clustered by SA, and variables standardised to SD units.
 #
 # Inputs (cwd): parcel_geoms.tsv (fetch_parcel_geoms.py), sa2011.csv,
 # sa_pop2015.csv, stops.csv, lrt.csv, schools.csv, landuse_pts.csv,
@@ -146,6 +171,56 @@ pop = pd.read_csv('sa_pop2015.csv'); pop = pop[pop['sa'] > 0].drop_duplicates('s
 U['pop2015'] = U.sa.map(pd.to_numeric(pop['pop'], errors='coerce'))
 U['religion'] = U.sa.map(pop['religion'])
 
+# ---------- added 2026-10-08: commerce, parking, street curvature, rail stations, votes ----------
+# Commercial units: Overture places (fetch_overture_extra.py). Overture recommends a confidence filter;
+# 0.5 drops the long tail of stale or duplicated listings (median confidence in Israel is 0.60).
+# "Commercial" = every category except public, civic, religious, educational, health-system, natural
+# and transport ones (a keyword list on Overture's basic_category). Clinics, pharmacies, hotels,
+# offices and all shops, restaurants and services count. The result is a count of businesses with a
+# public listing, a proxy for the number of commercial units (no open registry of non-residential
+# units exists; the gazetteer has residential assets only).
+PL = pd.read_parquet('ov_places.parquet')
+NONCOM = ['school', 'learning', 'education', 'preschool', 'college', 'university', 'hospital', 'religio', 'worship',
+          'church', 'mosque', 'synagogue', 'park', 'historic', 'monument', 'government', 'public_service', 'community',
+          'social', 'cemetery', 'military', 'landmark', 'nature', 'beach', 'mountain', 'structure', 'bus', 'train',
+          'station', 'airport', 'parking', 'police', 'fire', 'library', 'museum', 'embassy', 'courthouse', 'post_office',
+          'playground', 'garden', 'forest', 'river', 'lake', 'island', 'bridge', 'road', 'street']
+cat = PL.basic_category.fillna('').str.lower()
+is_com = (PL.confidence >= 0.5) & (cat != '') & ~cat.apply(lambda c: any(k in c for k in NONCOM))
+U['commerce'] = U.si.map(count_by_sa(PL.lon.values*KX, PL.lat.values*KY, is_com.values)).fillna(0)
+U['comm_dens'] = U.commerce / U.urb_km2
+print('commercial places', int(is_com.sum()), 'of', len(PL))
+# Parking: Overture base/infrastructure features with class "parking" (OSM amenity=parking: surface lots
+# and multi-storey structures) and "parking_entrance" (mostly entrances to underground garages).
+# Two measures: facilities per km2 of urban land, and the share of urban land covered by mapped parking
+# polygons. OSM mapping of parking is uneven across cities and private building parking is not mapped,
+# so this is a measure of visible public parking supply, not of residents' parking.
+PK = pd.read_parquet('ov_parking.parquet')
+PK = PK[PK['class'].isin(['parking', 'parking_entrance'])]
+pg = proj(shapely.from_wkb(PK.geometry.values))
+pp = shapely.point_on_surface(pg)
+U['parking_n'] = U.si.map(count_by_sa(shapely.get_x(pp), shapely.get_y(pp))).fillna(0)
+U['parking_dens'] = U.parking_n / U.urb_km2
+poly = shapely.get_type_id(pg) >= 3
+U['parking_km2'] = U.si.map(pd.Series(shapely.area(pg[poly])/1e6).groupby(to_sa(shapely.get_x(pp[poly]), shapely.get_y(pp[poly]))).sum()).fillna(0)
+U['parking_share'] = (U.parking_km2 / U.urb_km2).clip(upper=1)
+# Street curvature: circuity of the drive network (osm_streets.circuity_pieces): network length / chord
+# between intersections and dead ends, length-weighted over pieces whose midpoint is in the SA
+# (= sum of lengths / sum of chords, Boeing's "average circuity"). Missing if under 1 km of street.
+cxm, cym, cnet, cch = OS.circuity_pieces(OSS, OSC, OSS.drive.values)
+csa = to_sa(cxm, cym); k_ = csa >= 0
+cn = pd.Series(cnet[k_]).groupby(csa[k_]).sum(); cc = pd.Series(cch[k_]).groupby(csa[k_]).sum()
+U['circuity'] = U.si.map((cn/cc).where(cn >= 1000))
+# Rail and light-rail stations: stations (GTFS rail stops + light-rail entrances) within 1 km of the SA
+# polygon. Complements the building-level distance to the nearest station (d_rail below).
+_st = pd.concat([stops[stops.kind == 'rail'][['lon', 'lat']], pd.read_csv('lrt.csv')[['lon', 'lat']]])
+_sp = shapely.points(_st.lon.values*KX, _st.lat.values*KY)
+_i, _j = STRtree(sa_geom).query(_sp, predicate='dwithin', distance=1000)
+U['rail_1km'] = U.si.map(pd.Series(_j).value_counts()).fillna(0)
+# Vote shares, Knesset 25 (build_votes.py): Haredi parties (UTJ + Shas), UTJ alone, Arab parties, turnout.
+VT = pd.read_csv('sa_votes.csv').set_index('sa')
+for v in ['haredi', 'utj', 'arab', 'turnout', 'vgroup']: U[v] = U.sa.map(VT[v])
+
 # ---------- buildings: gazetteer parcels with centroid, SA, distances ----------
 B = c.sql("""select p.gush, p.parcel, p.units, p.fl, p.yr, p.city, cen.lat, cen.lon, cen.loc_q from p join cen using(gush, parcel)""").df()
 bx, by = B.lon.values*KX, B.lat.values*KY
@@ -201,19 +276,27 @@ print('buildings with FE', B.fe.notna().sum())
 
 # ---------- regressions ----------
 B = B.merge(U[['si', 'junc_dens', 'junc_dens_cad', 'junc_dens_walk', 'street_dens', 'deadend_share', 'fourway_share', 'orient_ent', 'road_share', 'units_dens', 'pop_dens', 'addr_dens', 'bus_dens',
-               'school_dens', 'mix', 'comm_share', 'ses21', 'parcel_med', 'religion', 'yishuv']], on='si', how='left')
+               'school_dens', 'mix', 'comm_share', 'ses21', 'parcel_med', 'religion', 'yishuv', 'comm_dens', 'parking_dens',
+               'parking_share', 'circuity', 'rail_1km', 'haredi', 'utj', 'arab', 'turnout']], on='si', how='left')
 R = B[(B.n >= 3) & B.junc_dens.notna() & B.fe.notna()].copy()
 R = R[(R.junc_dens > 0) & (R.units_dens > 0) & R.d_coast.notna()]
 R = R[R.road_share.notna() & (R.parcel_med > 0)]       # cadastral form measures (not in Judea and Samaria)
 R = R[R.loc_q <= 4]                                     # drop locality-level locations (SA unknown)
+# new measures (2026-10-08): drop the few buildings whose SA lacks them (no vote match in the locality,
+# or under 1 km of drivable street for circuity), so every model uses the same sample
+_n0 = len(R); R = R[R.circuity.notna() & R.haredi.notna()]
+print('regression sample', len(R), 'dropped for missing circuity / votes', _n0 - len(R))
 R['l_junc'] = np.log(R.junc_dens); R['l_units'] = np.log(R.units_dens); R['l_bus'] = np.log1p(R.bus_dens)
 R['l_cbd'] = np.log(R.d_cbd + 1); R['l_rail'] = np.log(R.d_rail + 0.2); R['l_coast'] = np.log(R.d_coast.clip(lower=0) + 0.2)
 R['l_parcel'] = np.log(R.parcel_med)
+R['l_comm'] = np.log1p(R.comm_dens); R['l_park'] = np.log1p(R.parking_dens)   # log(1+x): many SAs have none
 R['w'] = R.n.clip(upper=50).astype(float)
 R['dec'] = (R.yr // 10 * 10).fillna(0).astype(int).clip(1930, 2020)
 R['flb'] = pd.cut(R.fl.fillna(0), [-1, 0, 2, 4, 8, 15, 100], labels=['na', '1-2', '3-4', '5-8', '9-15', '16+']).astype(str)
-URB = ['l_junc', 'road_share', 'l_parcel', 'l_units', 'mix', 'comm_share', 'l_bus', 'l_rail', 'l_cbd', 'l_coast']
-for v in URB: R[v + '_z'] = (R[v] - np.average(R[v], weights=R.w)) / np.sqrt(np.cov(R[v], aweights=R.w))
+URB = ['l_junc', 'road_share', 'l_parcel', 'l_units', 'mix', 'comm_share', 'l_comm', 'l_park', 'circuity', 'l_bus',
+       'l_rail', 'l_cbd', 'l_coast']
+GRP = ['haredi', 'arab']                                # vote shares (Knesset 25), an alternative to the SES cluster
+for v in URB + GRP: R[v + '_z'] = (R[v] - np.average(R[v], weights=R.w)) / np.sqrt(np.cov(R[v], aweights=R.w))
 
 def wdemean(X, groups, w):
     if groups is None: return X - np.average(X, axis=0, weights=w)
@@ -249,7 +332,7 @@ Z = [v + '_z' for v in URB]
 res = {}
 res['m1_junc'] = ols(R, ['l_junc_z'])
 res['m2_urban'] = ols(R, Z)
-FORM = ['l_junc_z', 'road_share_z', 'l_parcel_z', 'l_units_z', 'mix_z', 'comm_share_z', 'l_bus_z']
+FORM = ['l_junc_z', 'road_share_z', 'l_parcel_z', 'l_units_z', 'mix_z', 'comm_share_z', 'l_comm_z', 'l_park_z', 'circuity_z', 'l_bus_z']
 LOC = ['l_rail_z', 'l_cbd_z', 'l_coast_z']
 res['m_form'] = ols(R, FORM)
 res['m_loc'] = ols(R, LOC)
@@ -259,6 +342,13 @@ res['m4_city'] = ols(R, Z, absorb=['yishuv'], dummies=['ses21'])
 res['m5_bld'] = ols(R, Z, absorb=['yishuv'], dummies=['ses21', 'dec', 'flb'])
 res['m6_junc_city'] = ols(R, ['l_junc_z'], absorb=['yishuv'])
 res['m7_junc_city_ses'] = ols(R, ['l_junc_z'], absorb=['yishuv'], dummies=['ses21'])
+# vote shares as the group control, alone and with SES; all within city
+G = [g + '_z' for g in GRP]
+res['m8_city_votes'] = ols(R, Z + G, absorb=['yishuv'])
+res['m9_city_ses_votes'] = ols(R, Z + G, absorb=['yishuv'], dummies=['ses21'])
+res['r2_votes'] = ols(R, G)['r2']
+res['r2_ses_votes'] = ols(R, G, dummies=['ses21'])['r2']
+res['sd_grp'] = {v: float(np.sqrt(np.cov(R[v], aweights=R.w))) for v in GRP}
 # OSM vs cadastral, and the extra OSM network measures: one at a time (z-scored), on the sample
 # where all are defined: raw, within city, within city + SES
 Q = R[(R.junc_dens_cad > 0) & (R.junc_dens_walk > 0) & (R.street_dens > 0) & R.deadend_share.notna()

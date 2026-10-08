@@ -8,6 +8,11 @@
 #   Haredi = Jewish 2008 SA where >= 40% of those 15+ last studied in a yeshiva (CBS census 2008,
 #            education layer, yeshiva_pcnt). Bnei Brak median 72%, Modi'in Illit 94%, Tel Aviv 1.4%.
 #   Other  = everything else.
+# Second classification, from votes (build_votes.py, Knesset 25, by SA 2011): Haredi SA if UTJ + Shas
+#   have >= 50% of valid votes, Arab SA if Arab parties (Ra'am, Hadash-Ta'al, Balad) have >= 50%.
+#   It is more recent (2022 vs 2008) and on the 2011 SA grid; it counts Druze villages as "other"
+#   (they vote for other parties) and adds Haredi neighbourhoods built after 2008. Both
+#   classifications are estimated; the page shows them side by side.
 #
 # Model 1 (per group):  ln p_ibt = sum_f gamma_f 1[floor_i = f] + alpha_b + tau_t + kappa_a + e
 #   p = real price per m2 (CPI, 2015 shekels), b = building (gush-parcel), t = month, a = rounded m2.
@@ -44,7 +49,10 @@ arab = np.where(k8 >= 0, pd.notna(rel8) & (rel8 != 'יהודים'),
                 pd.Series(rely).isin(['ערבי', 'לא יהודי', 'מעורב-ערבי']).values)   # values checked below
 D['grp'] = np.where(arab, 'ערבי', np.where(np.nan_to_num(yes8) >= 40, 'חרדי', 'אחר'))
 print('religion_yishuv values', pd.Series(rely).value_counts().to_dict())
+VT = pd.read_csv('sa_votes.csv').set_index('sa')
+D['vgrp'] = pd.Series(sa11).map(VT.vgroup).fillna('אחר').values     # SAs without a vote match: other
 print('groups', D.grp.value_counts().to_dict(), 'in 2008 SA', (k8 >= 0).mean().round(3))
+print('vote groups', D.vgrp.value_counts().to_dict(), 'agreement with census groups', round(float((D.vgrp == D.grp).mean()), 3))
 
 codes = lambda s: pd.factorize(s)[0]
 def demean(M, gs, iters=40):
@@ -65,19 +73,23 @@ def fwl(d, X, absorb, cluster):
 
 D['flc'] = D.fl.clip(upper=25).astype(int)
 D['ar'] = D.area.round()
-out = {'n': int(len(D)), 'groups': {}, 'height': {}}
-for gname, d in [('הכול', D)] + list(D.groupby('grp')):
-    d = d[d.groupby('bld').bld.transform('size') >= 2]
-    X = pd.get_dummies(d.flc, prefix='f', dtype=float).drop(columns='f_1')
-    r = fwl(d, X, ['bld', 'ym', 'ar'], 'bld')
-    fl = {int(k[2:]): [round(float(np.exp(v.b) - 1), 4), round(float(v.se), 4), int((d.flc == int(k[2:])).sum())] for k, v in r.iterrows()}
-    fl[1] = [0.0, 0.0, int((d.flc == 1).sum())]
-    # per-floor gradient above the 4th floor: slope of gamma_f on f for f = 5..20 (weighted by deals)
-    ff = np.array([f for f in range(5, 21) if f in fl and fl[f][2] >= 200]); gg = np.log1p([fl[f][0] for f in ff])
-    slope = float(np.polyfit(ff, gg, 1, w=np.sqrt([fl[f][2] for f in ff]))[0]) if len(ff) > 3 else None
-    out['groups'][gname] = {'floor': {str(k): fl[k] for k in sorted(fl)}, 'n': int(len(d)), 'buildings': int(d.bld.nunique()),
-                            'slope_5_20': None if slope is None else round(np.exp(slope) - 1, 4)}
-    print(gname, len(d), 'slope', out['groups'][gname]['slope_5_20'], {k: fl[k][0] for k in (0, 2, 5, 10, 15, 20) if k in fl})
+out = {'n': int(len(D)), 'groups': {}, 'height': {}, 'groups_votes': {}, 'height_votes': {},
+       'agreement': round(float((D.vgrp == D.grp).mean()), 3),
+       'crosstab': pd.crosstab(D.grp, D.vgrp).to_dict()}
+def model1(gcol, key):
+  for gname, d in [('הכול', D)] + list(D.groupby(gcol)):
+      d = d[d.groupby('bld').bld.transform('size') >= 2]
+      X = pd.get_dummies(d.flc, prefix='f', dtype=float).drop(columns='f_1')
+      r = fwl(d, X, ['bld', 'ym', 'ar'], 'bld')
+      fl = {int(k[2:]): [round(float(np.exp(v.b) - 1), 4), round(float(v.se), 4), int((d.flc == int(k[2:])).sum())] for k, v in r.iterrows()}
+      fl[1] = [0.0, 0.0, int((d.flc == 1).sum())]
+      # per-floor gradient above the 4th floor: slope of gamma_f on f for f = 5..20 (weighted by deals)
+      ff = np.array([f for f in range(5, 21) if f in fl and fl[f][2] >= 200]); gg = np.log1p([fl[f][0] for f in ff])
+      slope = float(np.polyfit(ff, gg, 1, w=np.sqrt([fl[f][2] for f in ff]))[0]) if len(ff) > 3 else None
+      out[key][gname] = {'floor': {str(k): fl[k] for k in sorted(fl)}, 'n': int(len(d)), 'buildings': int(d.bld.nunique()),
+                              'slope_5_20': None if slope is None else round(np.exp(slope) - 1, 4)}
+      print(key, gname, len(d), 'slope', out[key][gname]['slope_5_20'], {k: fl[k][0] for k in (0, 2, 5, 10, 15, 20) if k in fl})
+model1('grp', 'groups'); model1('vgrp', 'groups_votes')
 
 # ---- (2) building height, holding unit floor fixed
 H = D[D.bfl.notna() & (D.bfl > 0)].copy()
@@ -87,20 +99,22 @@ H['age'] = (H.y - H.yr).where(H.yr.between(1900, 2027))
 H['ageb'] = pd.cut(H.age, [-5, 2, 10, 20, 30, 40, 50, 60, 200], labels=['0-2', '3-10', '11-20', '21-30', '31-40', '41-50', '51-60', '60+']).astype(str)
 H['rb'] = np.ceil(H.rooms.clip(1, 7)).fillna(0).astype(int)
 H['lar'] = np.log(H.area)
-for gname, d in [('הכול', H)] + list(H.groupby('grp')):
-    X = pd.concat([pd.get_dummies(d.hb, prefix='h', dtype=float).drop(columns='h_3–4'),
-                   pd.get_dummies(d.flc, prefix='f', dtype=float).drop(columns='f_1'),
-                   pd.get_dummies(d.ageb, prefix='a', dtype=float).drop(columns='a_21-30'),
-                   pd.get_dummies(d.rb, prefix='r', dtype=float).drop(columns='r_3', errors='ignore'), d[['lar']]], axis=1)
-    X = X.loc[:, X.std() > 0]
-    r = fwl(d, X, [('gush', 'y'), 'ym'], 'gush')
-    hh = {k[2:]: [round(float(np.exp(v.b) - 1), 4), round(float(v.se), 4), int((d.hb == k[2:]).sum())] for k, v in r.iterrows() if k.startswith('h_')}
-    hh['3–4'] = [0.0, 0.0, int((d.hb == '3–4').sum())]
-    # same without the unit-floor dummies: how much of the tower premium is the unit's own floor
-    r0 = fwl(d, X[[c for c in X.columns if not c.startswith('f_')]], [('gush', 'y'), 'ym'], 'gush')
-    h0 = {k[2:]: round(float(np.exp(v.b) - 1), 4) for k, v in r0.iterrows() if k.startswith('h_')}
-    h0['3–4'] = 0.0
-    out['height'][gname] = {'with_floor': hh, 'no_floor': h0, 'n': int(len(d)), 'gush': int(d.gush.nunique()),
-                            'larea': round(float(r.loc['lar', 'b']), 3)}
-    print('height', gname, len(d), {k: hh[k][0] for k in hh}, 'no floor', h0)
+def model2(gcol, key):
+  for gname, d in [('הכול', H)] + list(H.groupby(gcol)):
+      X = pd.concat([pd.get_dummies(d.hb, prefix='h', dtype=float).drop(columns='h_3–4'),
+                     pd.get_dummies(d.flc, prefix='f', dtype=float).drop(columns='f_1'),
+                     pd.get_dummies(d.ageb, prefix='a', dtype=float).drop(columns='a_21-30'),
+                     pd.get_dummies(d.rb, prefix='r', dtype=float).drop(columns='r_3', errors='ignore'), d[['lar']]], axis=1)
+      X = X.loc[:, X.std() > 0]
+      r = fwl(d, X, [('gush', 'y'), 'ym'], 'gush')
+      hh = {k[2:]: [round(float(np.exp(v.b) - 1), 4), round(float(v.se), 4), int((d.hb == k[2:]).sum())] for k, v in r.iterrows() if k.startswith('h_')}
+      hh['3–4'] = [0.0, 0.0, int((d.hb == '3–4').sum())]
+      # same without the unit-floor dummies: how much of the tower premium is the unit's own floor
+      r0 = fwl(d, X[[c for c in X.columns if not c.startswith('f_')]], [('gush', 'y'), 'ym'], 'gush')
+      h0 = {k[2:]: round(float(np.exp(v.b) - 1), 4) for k, v in r0.iterrows() if k.startswith('h_')}
+      h0['3–4'] = 0.0
+      out[key][gname] = {'with_floor': hh, 'no_floor': h0, 'n': int(len(d)), 'gush': int(d.gush.nunique()),
+                              'larea': round(float(r.loc['lar', 'b']), 3)}
+      print(key, gname, len(d), {k: hh[k][0] for k in hh}, 'no floor', h0)
+model2('grp', 'height'); model2('vgrp', 'height_votes')
 json.dump(out, open('floor_groups.json', 'w'), ensure_ascii=False)

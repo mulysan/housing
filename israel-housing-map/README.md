@@ -28,15 +28,23 @@ Two published pages are built from the same data:
 | CBS statistical areas 2011 + SES 2021, population, land use; GTFS stops, light rail, schools, addresses | over.org.il | `fetch_urban_layers.py` |
 | OpenStreetMap streets and boundaries | Overture Maps (public S3, release 2026-09-23.1) | `fetch_overture_roads.py` |
 | CPI | CBS monthly CPI (`cpi.xlsx`) | — |
+| Knesset election results by ballot box (K23–K25) and polling-station locations (K26) | Central Elections Committee and govmap, via over.org.il | `fetch_votes.py` |
+| CBS census 2008 statistical areas (yeshiva share, household size, religion) | over.org.il | `fetch_sa2008.py` |
+| Businesses (places) and parking (OSM) | Overture Maps | `fetch_overture_extra.py` |
 
 ## Build order
 
 ```
-fetch_parcel_centroids → fetch_urban_layers → geocode_parcels → build_prices → fetch_parcel_geoms
-→ fetch_big_thin_parcels → fetch_gush_region → fetch_govmap_deals → build_txn → build_hedonic
-→ build_iv → build_floor → fetch_overture_roads → build_urban → val_summary → build_areas
-→ build_varmap → build_basemap_osm → build_page_v4 MAP_URL REPORT_URL
+fetch_parcel_centroids → fetch_urban_layers → fetch_overture_roads → fetch_overture_extra
+→ fetch_votes → fetch_sa2008 → geocode_parcels → build_prices → fetch_parcel_geoms
+→ fetch_big_thin_parcels → fetch_govmap_deals → geocode_parcels → build_prices (again, with govmap)
+→ fetch_gush_region → build_txn → build_floor → build_hedonic → build_iv → build_votes
+→ build_urban → val_summary → build_floor_groups → build_km → build_areas → build_varmap
+→ build_basemap_osm → build_page_v4 MAP_URL REPORT_URL
 ```
+
+Every script starts with a header that states its inputs, outputs and each data decision
+(sample filters, thresholds, imputations, matching rules) with the reason for it.
 
 `map_v4_template.html` is the page template (one template, two pages; `make_v4_template.py`
 derived it from the earlier single-page `map_v3_template.html`).

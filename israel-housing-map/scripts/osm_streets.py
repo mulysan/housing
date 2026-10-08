@@ -66,6 +66,38 @@ def orient_entropy(brg, L, nb=36):
     p = np.r_[h, h]/(2*h.sum()); p = p[p > 0]
     return -(p*np.log(p)).sum()/np.log(nb)
 
+def circuity_pieces(S, C, mask):
+    """Street curvature after Boeing (2019, "Urban spatial order"): circuity = network length / straight-line
+    (chord) length between graph nodes. Graph nodes are connectors with street count != 2 (intersections and
+    dead ends), as in a simplified OSMnx graph; each segment is cut at those connectors.
+    Caveat: Overture also splits segments at attribute changes, so a street piece between two
+    intersections can span several segments; its chord is then measured per segment, which makes
+    circuity a slight lower bound. Pieces with a chord under 10 m (and closed loops) are dropped:
+    there the ratio is dominated by noise.
+    Returns midpoint x, y (m), network length and chord (m) per piece."""
+    sub = S.loc[mask]
+    lens = sub.connectors.map(len).values
+    cid = np.concatenate([[c['connector_id'] for c in cs] for cs in sub.connectors.values])
+    at = np.concatenate([[c['at'] for c in cs] for cs in sub.connectors.values])
+    w = np.where((at <= 1e-9) | (at >= 1 - 1e-9), 1, 2)
+    k = pd.Series(w).groupby(cid).sum()
+    node = pd.Series(cid).map(k).values != 2                   # cut here
+    seg = np.repeat(np.arange(len(sub)), lens)
+    # cut fractions per segment: 0, 1 and the node connectors in between
+    F = pd.DataFrame({'seg': np.r_[seg[node], np.arange(len(sub)), np.arange(len(sub))],
+                      'f': np.r_[at[node], np.zeros(len(sub)), np.ones(len(sub))]}).drop_duplicates().sort_values(['seg', 'f'])
+    geo = shapely.transform(shapely.from_wkb(sub.geometry.values), lambda c: np.c_[c[:, 0]*KX, c[:, 1]*KY])
+    L = shapely.length(geo)
+    pt = shapely.line_interpolate_point(geo[F.seg.values], F.f.values, normalized=True)
+    x, y = shapely.get_x(pt), shapely.get_y(pt)
+    same = F.seg.values[1:] == F.seg.values[:-1]
+    df = np.diff(F.f.values)[same]; sg = F.seg.values[1:][same]
+    net = df * L[sg]
+    chord = np.hypot(np.diff(x)[same], np.diff(y)[same])
+    mx, my = ((x[1:] + x[:-1])/2)[same], ((y[1:] + y[:-1])/2)[same]
+    ok = (chord >= 10) & (net >= chord*0.999)
+    return mx[ok], my[ok], net[ok], chord[ok]
+
 if __name__ == '__main__':      # validation against the Overpass 1 km2 boxes (osm_val/)
     S, C = load()
     V = pd.read_csv('osm_val/val_boxes.csv')
