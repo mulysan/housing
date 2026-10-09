@@ -2,7 +2,7 @@
 #   housing_map.html     the parcel map app (points embedded; OSM street tiles fetched from roads/)
 #   housing_report.html  the analysis: indices, IV, hedonic, urban form, floor, variable maps, explorer
 # Inputs in cwd: parcels_v3.parquet, gush_v3.parquet, bld_fe.csv, sa_urban.csv, results_v3.json,
-# txn_v3.json, urban_v3.json, junc_val.json, floor_v3.json, floor_groups.json (build_floor_groups.py), km_v3.json (build_km.py), km_grid.json (build_km_grid.py), size_paper.json (build_size_paper.py), hedonic_v3.json, areas_v3.json,
+# txn_v3.json, urban_v3.json, junc_val.json, floor_v3.json, floor_groups.json (build_floor_groups.py), km_v3.json (build_km.py), km_grid.json (build_km_grid.py), size_paper.json (build_size_paper.py), sa_xy.json (build_sa_xy.py), hedonic_v3.json, areas_v3.json,
 # iv_v3.json, varmap.b64, varmap_info.json, var_dict.py, land-data.json, label-data.json, leaflet.css, roads/ (build_basemap_osm.py).
 # Usage: python build_page_v4.py MAP_URL REPORT_URL   (each page links to the other)
 # With --from-live live.html, the data blocks not rebuilt yet are taken from a published page.
@@ -100,7 +100,7 @@ SUB = (f'{round(n_par/1000)} אלף חלקות מגורים, כולל יהודה
 fill = {'/*META*/': json.dumps(meta, ensure_ascii=False), '/*PTS*/': pts, '/*GUSH*/': json.dumps(gush, separators=(',', ':')),
         '/*RES*/': json.dumps(R, ensure_ascii=False, default=float),
         '/*TXN*/': data('txn_v3.json', 'txn-data'), '/*URB*/': data('urban_v3.json', 'urb-data'), '/*JVAL*/': data('junc_val.json', 'jval-data'),
-        '/*FLOOR*/': data('floor_v3.json', 'floor-data'), '/*FLOORG*/': open('floor_groups.json').read(), '/*KM*/': open('km_v3.json').read(), '/*KMG*/': open('km_grid.json').read(), '/*SIZEP*/': sizep(), '/*HED*/': data('hedonic_v3.json', 'hed-data'),
+        '/*FLOOR*/': data('floor_v3.json', 'floor-data'), '/*FLOORG*/': open('floor_groups.json').read(), '/*KM*/': open('km_v3.json').read(), '/*KMG*/': open('km_grid.json').read(), '/*SIZEP*/': sizep(), '/*SAXY*/': open('sa_xy.json').read(), '/*HED*/': data('hedonic_v3.json', 'hed-data'),
         '/*AREAS*/': data('areas_v3.json', 'areas-data'), '/*IV*/': data('iv_v3.json', 'iv-data'), '/*VARMAP*/': data('varmap.b64', 'varmap'),
         '/*VARDICT*/': vardict(),
         '/*LAND*/': open('land-data.json').read(), '/*LABELS*/': open('label-data.json').read(),

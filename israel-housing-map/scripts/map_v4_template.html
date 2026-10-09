@@ -347,6 +347,23 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     <div class="method"><b>איך זה חושב</b><div class="eq" dir="ltr">שלב 1: ln(<i>P</i>/m²)<sub><i>i</i></sub> = α<sub><i>b</i>(<i>i</i>)</sub> + τ<sub><i>t</i>(<i>i</i>)</sub> + κ<sub><i>a</i>(<i>i</i>)</sub> + ε<sub><i>i</i></sub>   →   α̂<sub><i>b</i></sub> = "אפקט הבניין"</div><div class="eq" dir="ltr">שלב 2: α̂<sub><i>b</i></sub> = <i>Z</i><sub><i>s</i>(<i>b</i>)</sub>′β + <i>L<sub>b</sub></i>′λ + μ<sub>city</sub> + Σ<sub><i>k</i></sub> 1[SES<sub><i>s</i></sub>=<i>k</i>] + <i>v<sub>b</sub></i>,   weight = min(<i>n<sub>b</sub></i>, 50)</div><p><i>Z</i> = מדדי צורה של האזור הסטטיסטי, כל אחד בסטיות תקן: צמתים לקמ"ר (OSM), שיעור שטח דרכים, גודל חלקה, דירות לקמ"ר, עירוב שימושים, שיעור מסחר בשימושי הקרקע, עסקים לקמ"ר (Overture, ביטחון 0.5 ומעלה, בלי מוסדות ציבור, דת, חינוך וטבע), חניונים וכניסות לחניון לקמ"ר (OSM), עקמומיות הרחובות (אורך רשת הנסיעה חלקי המרחק הישר בין צמתים) ותחנות אוטובוס. במודל "עיר + הצבעה", במקום אשכול SES נכנסים חלק הקולות ליהדות התורה ולש"ס ולמפלגות הערביות בכנסת 25, לפי האזור הסטטיסטי. <i>L</i> = מיקום: לוג המרחק לתחנת רכבת או רק"ל, למרכז תל אביב ולחוף. μ<sub>city</sub> = אפקט קבוע ליישוב, SES = אשכול חברתי־כלכלי 2021. רק בניינים עם 3 עסקאות לפחות. בניין שחסר לו ערך באחד המשתנים (למשל שטח דרכים קדסטרי ביהודה ושומרון, שנת בנייה או מספר קומות) נשמט רק מהרגרסיות שבהן המשתנה נכנס, ולכן מספר התצפיות שונה בין המודלים. שגיאות התקן מקובצות לפי אזור סטטיסטי. משתנים בלוג נכנסים כלוג (β = גמישות), שיעורים ל־10 נקודות אחוז (מדווח exp(β)−1), ומדדים בלי יחידה טבעית מתוקננים (לסטיית תקן). עסקים, תחנות אוטובוס וחניונים: ln(x) כש־x > 0, ומשתנה דמי 1[x = 0] לאזורים בלי אף אחד, במקום ln(1+x) שתלוי ביחידות. מרחקים: ln(ק"מ + 0.2) לרכבת ולחוף ו־ln(ק"מ + 1) למרכז תל אביב. R² בתרשים הימני: מה שמודל עם קבוצת המשתנים בלבד מסביר מהשונות של α̂<sub><i>b</i></sub>.</p></div>
   </section>
 
+  <section id="xysec">
+    <h2>כל משתנה מול כל משתנה, ברמת אזור סטטיסטי, עם ובלי אפקט עיר</h2>
+    <p class="lede">בוחרים משתנה לציר Y ומשתנה לציר X. כל נקודה היא ממוצע של 5% מהאזורים הסטטיסטיים, ממוינים לפי X (20 קבוצות שוות לפי משקל). אפור: כל הארץ. כחול: אחרי ניכוי ממוצע העיר משני המשתנים (אפקט עיר), כלומר השוואה בין שכונות באותה עיר, מוזזת חזרה לממוצע הארצי. משתנים ברמת בניין (למשל אפקט הבניין) הם ממוצע הבניינים באזור; משתני עסקאות הם על מכירות 2015–2025. כל אזור משוקלל במספר הבניינים שלו.</p>
+    <div class="chips">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)">Y <select id="xyY" aria-label="משתנה בציר Y"></select></label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted)"><input type="checkbox" id="xyYl"> לוג</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)">X <select id="xyX" aria-label="משתנה בציר X"></select></label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted)"><input type="checkbox" id="xyXl"> לוג</label>
+      <button class="chip" id="xySwap" aria-pressed="false">החלפת צירים</button>
+    </div>
+    <div class="chart" style="margin-top:8px"><h3 id="xyT"></h3>
+      <div class="key"><span><i style="background:var(--nodata)"></i>כל הארץ</span><span><i style="background:var(--accent)"></i>בתוך העיר (אפקט עיר)</span></div>
+      <svg id="xyC" viewBox="0 0 1120 360" role="img" aria-label="משתנה מול משתנה"></svg></div>
+    <div class="tablewrap" style="max-height:none;margin-top:10px"><table style="font-size:13px" id="xyTab"></table></div>
+    <p class="lede" id="xyNote" style="font-size:12.5px"></p>
+  </section>
+
   <section id="juncval">
     <h2>בדיקת הצמתים מול OpenStreetMap</h2>
     <p class="lede" id="jvlede"></p>
@@ -558,6 +575,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
 <!--REPORT--><script type="application/json" id="km-data">/*KM*/</script><!--/REPORT-->
 <!--REPORT--><script type="application/json" id="kmg-data">/*KMG*/</script><!--/REPORT-->
 <!--REPORT--><script type="application/json" id="sz-data">/*SIZEP*/</script><!--/REPORT-->
+<!--REPORT--><script type="application/json" id="saxy-data">/*SAXY*/</script><!--/REPORT-->
 <!--REPORT--><script type="application/json" id="hed-data">/*HED*/</script><!--/REPORT-->
 <script type="application/json" id="areas-data">/*AREAS*/</script>
 <script type="application/json" id="vardict">/*VARDICT*/</script>
@@ -1201,6 +1219,61 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       `<tr>${'<th class="num">−1/σ (se)</th><th class="num">R² פנימי</th>'.repeat(3)}<th class="num">−1/σ (se)</th><th class="num">R² פנימי</th><th class="num">שיפוע (se)</th><th class="num">R²</th><th class="num">שיפוע (se)</th><th class="num">R²</th></tr></thead><tbody>` +
       W3.map(([w, lab]) => `<tr><td>${lab}</td>${cellm(M[w+'_fe'])}${cellm(M[w+'_trend'])}${cellm(M[w+'_fe_iv'])}${cellm(MT[w+'_fe'])}${cellc(T.long_diff[w])}${cellc(CR[w])}</tr>`).join('') + '</tbody>';
     const gc = C.growth_corr;
+    { const XY = J('saxy-data'), VS = XY.vars, W8 = XY.w, CT = XY.city, byK = {};
+      VS.forEach((v, i) => byK[v.k] = i);
+      const sY = document.getElementById('xyY'), sX = document.getElementById('xyX'), lY = document.getElementById('xyYl'), lX = document.getElementById('xyXl');
+      const opts = VS.map(v => `<option value="${v.k}">${v.lab}</option>`).join(''); sY.innerHTML = opts; sX.innerHTML = opts;
+      sY.value = 'fe'; sX.value = 'junc_dens'; lY.checked = VS[byK.fe].lg; lX.checked = VS[byK.junc_dens].lg;
+      const fv = (v, x) => x == null || !isFinite(x) ? '—' : v.u === 'נקודות לוג' ? (x*100).toFixed(0) : v.share ? (x*100).toFixed(x < 0.1 ? 1 : 0) + '%' :
+        Math.abs(x) >= 1000 ? Math.round(x).toLocaleString('en-US') : Math.abs(x) >= 100 ? x.toFixed(0) : Math.abs(x) >= 10 ? x.toFixed(1) : x.toFixed(2);
+      const bins = (x, y, w, nb) => { const o = x.map((_, i) => i).sort((a, b) => x[a] - x[b]), tw = w.reduce((a, b) => a + b, 0); const out = []; let k = 0, sw = 0, sx = 0, sy = 0, cum = 0;
+        for (const i of o) { sw += w[i]; sx += w[i]*x[i]; sy += w[i]*y[i]; cum += w[i];
+          if (cum >= tw*(k + 1)/nb - 1e-9) { if (sw > 0) out.push([sx/sw, sy/sw]); k++; sw = sx = sy = 0; } }
+        if (sw > 0) out.push([sx/sw, sy/sw]); return out; };
+      const ols = (x, y, w, g) => { const tw = w.reduce((a, b) => a + b, 0), mx = x.reduce((a, v, i) => a + w[i]*v, 0)/tw, my = y.reduce((a, v, i) => a + w[i]*v, 0)/tw;
+        let sxx = 0, sxy = 0, syy = 0; x.forEach((v, i) => { sxx += w[i]*(v-mx)**2; sxy += w[i]*(v-mx)*(y[i]-my); syy += w[i]*(y[i]-my)**2; });
+        const b = sxy/sxx, a = my - b*mx, sc = {}; x.forEach((v, i) => { const e = y[i] - a - b*v; sc[g[i]] = (sc[g[i]] || 0) + w[i]*(v-mx)*e; });
+        const G = Object.keys(sc).length, se = Math.sqrt(Object.values(sc).reduce((s_, v) => s_ + v*v, 0) * G/Math.max(G-1, 1)) / sxx;
+        return { a, b, se, r2: sxy*sxy/(sxx*syy), mx, my, G }; };
+      const draw = () => { const vy = VS[byK[sY.value]], vx = VS[byK[sX.value]], ly = lY.checked, lx = lX.checked;
+        const tr = (v, l) => v == null ? null : l ? (v > 0 ? Math.log(v) : null) : v;
+        const I = [], x = [], y = [], w = [], g = []; let drop0 = 0;
+        for (let i = 0; i < XY.n; i++) { if (vx.x[i] == null || vy.x[i] == null) continue; const a = tr(vx.x[i], lx), b = tr(vy.x[i], ly);
+          if (a == null || b == null) { drop0++; continue; } x.push(a); y.push(b); w.push(W8[i]); g.push(CT[i]); }
+        if (x.length < 40) { document.getElementById('xyC').innerHTML = ''; document.getElementById('xyTab').innerHTML = ''; document.getElementById('xyNote').textContent = 'מעט מדי אזורים עם שני המשתנים.'; return; }
+        // within city: demean x and y by the city's weighted mean (cities with at least 2 SAs), add back the overall mean
+        const cs = {}; x.forEach((v, i) => { const c = cs[g[i]] || (cs[g[i]] = [0, 0, 0, 0]); c[0] += w[i]; c[1] += w[i]*v; c[2] += w[i]*y[i]; c[3]++; });
+        const r0 = ols(x, y, w, g), xi = [], yi = [], wi = [], gi = [];
+        x.forEach((v, i) => { const c = cs[g[i]]; if (c[3] < 2) return; xi.push(v - c[1]/c[0] + r0.mx); yi.push(y[i] - c[2]/c[0] + r0.my); wi.push(w[i]); gi.push(g[i]); });
+        const r1 = xi.length > 40 ? ols(xi, yi, wi, gi) : null;
+        const B0 = bins(x, y, w, 20), B1 = r1 ? bins(xi, yi, wi, 20) : [];
+        const all = B0.concat(B1), ax0 = Math.min(...all.map(p => p[0])), ax1 = Math.max(...all.map(p => p[0])), ay0 = Math.min(...all.map(p => p[1])), ay1 = Math.max(...all.map(p => p[1]));
+        const px = (ax1 - ax0)*0.05 || 0.1, py = (ay1 - ay0)*0.12 || 0.1, X0 = ax0 - px, X1 = ax1 + px, Y0 = ay0 - py, Y1 = ay1 + py;
+        const el = document.getElementById('xyC'), Wd = 1120, H = 360, L0 = 70, R0 = 16, T0 = 14, Bm = 44;
+        const SX = v => L0 + (v - X0)/(X1 - X0)*(Wd - L0 - R0), SY = v => H - Bm - (v - Y0)/(Y1 - Y0)*(H - T0 - Bm);
+        const ticks = (a, b, l) => { if (l) { const out = []; for (let e = Math.floor(a/Math.LN10) - 1; e <= Math.ceil(b/Math.LN10); e++) for (const m of [1, 2, 5]) { const t = Math.log(m*10**e); if (t >= a && t <= b) out.push(t); } return out.length >= 2 ? out : [a, b]; }
+          const raw = (b - a)/5, mag = 10**Math.floor(Math.log10(raw)), st = [1, 2, 2.5, 5, 10].map(m => m*mag).find(v => v >= raw); const out = []; for (let t = Math.ceil(a/st)*st; t <= b + 1e-12; t += st) out.push(+t.toFixed(10)); return out; };
+        let s = '';
+        ticks(Y0, Y1, ly).forEach(t => { s += `<line class="grid" x1="${L0}" x2="${Wd-R0}" y1="${SY(t)}" y2="${SY(t)}"></line><text x="${L0-6}" y="${SY(t)+4}" text-anchor="end">${fv(vy, ly ? Math.exp(t) : t)}</text>`; });
+        ticks(X0, X1, lx).forEach(t => { s += `<line class="grid" x1="${SX(t)}" x2="${SX(t)}" y1="${T0}" y2="${H-Bm}" style="opacity:.5"></line><text x="${SX(t)}" y="${H-Bm+16}" text-anchor="middle">${fv(vx, lx ? Math.exp(t) : t)}</text>`; });
+        s += `<text x="${(Wd+L0)/2}" y="${H-6}" text-anchor="middle">${vx.lab}${lx ? ' (סקלה לוגריתמית)' : ''}</text>`;
+        const line = (r, col) => r ? `<line x1="${SX(X0+px)}" x2="${SX(X1-px)}" y1="${SY(r.a + r.b*(X0+px))}" y2="${SY(r.a + r.b*(X1-px))}" style="stroke:${col};stroke-width:1.6;stroke-dasharray:5 3"></line>` : '';
+        s += line(r0, 'var(--nodata)') + line(r1, 'var(--accent)');
+        const dots = (B, col, lab) => B.map(p => `<g class="h"><title>${lab}: ${vx.lab} ${fv(vx, lx ? Math.exp(p[0]) : p[0])}, ${vy.lab} ${fv(vy, ly ? Math.exp(p[1]) : p[1])}</title><circle cx="${SX(p[0])}" cy="${SY(p[1])}" r="5" style="fill:${col}"></circle></g>`).join('');
+        s += dots(B0, 'var(--nodata)', 'כל הארץ') + dots(B1, 'var(--accent)', 'בתוך העיר');
+        el.innerHTML = s; el.querySelectorAll('text').forEach(fixBidi);
+        document.getElementById('xyT').textContent = `${vy.lab}${ly ? ' (לוג)' : ''} מול ${vx.lab}${lx ? ' (לוג)' : ''}`;
+        const unit = (v, l) => l ? '1 נקודת לוג (×2.7)' : v.share ? '1 (100 נקודות אחוז)' : `1 ${v.u}`;
+        const row = (lab, r, n) => r ? `<tr><td>${lab}</td><td class="num"${Math.abs(r.b/r.se) > 1.96 ? ' style="font-weight:700"' : ''}>${r.b.toPrecision(3)} <span style="color:var(--muted);font-weight:400">(${r.se.toPrecision(2)})</span></td><td class="num">${(r.r2*100).toFixed(1)}%</td><td class="num">${n.toLocaleString('en-US')}</td><td class="num">${r.G}</td></tr>` : '';
+        document.getElementById('xyTab').innerHTML = `<thead><tr><th></th><th class="num">שיפוע (טעות תקן לפי עיר)</th><th class="num">R²</th><th class="num">אזורים</th><th class="num">ערים</th></tr></thead><tbody>${row('כל הארץ', r0, x.length)}${row('בתוך העיר (אפקט עיר)', r1, xi.length)}</tbody>`;
+        document.getElementById('xyNote').textContent = `השיפוע הוא השינוי ב־Y (${ly ? 'בלוג' : vy.u === 'נקודות לוג' ? 'בנקודות לוג, ×100 = בערך %' : vy.share ? 'כשיעור, ×100 = נקודות אחוז' : 'ב' + vy.u}) כש־X עולה ב־${unit(vx, lx)}. `+
+          `רגרסיה משוקללת במספר הבניינים; בעמודת "בתוך העיר" שני המשתנים מנוכים מממוצע העיר, וערים עם אזור סטטיסטי אחד נשמטות. טעות התקן מקובצת לפי עיר. מודגש: |t| > 1.96. ${drop0 ? `${drop0} אזורים עם ערך 0 או שלילי נשמטו בגלל הלוג.` : ''}`;
+      };
+      [sY, sX].forEach((el_, j) => el_.addEventListener('change', () => { (j ? lX : lY).checked = VS[byK[el_.value]].lg; draw(); }));
+      [lY, lX].forEach(el_ => el_.addEventListener('change', draw));
+      document.getElementById('xySwap').addEventListener('click', () => { const a = sY.value, b = lY.checked; sY.value = sX.value; lY.checked = lX.checked; sX.value = a; lX.checked = b; draw(); });
+      draw();
+    }
     { const SP = J('sz-data'), SZ = ['1-2','3','4','5+'], CLS = ['k1','k2','k3','k4'], b = SP.built_share;
       const ma = v => v.map((x, i) => (i === 0 || i === v.length - 1) ? x : (v[i-1] + x + v[i+1])/3);
       lineChart('szbuilt', SZ.map((z, k) => { const m = ma(b[z]); return { cls: CLS[k], pts: b.y.map((t, i) => [t, m[i]]) }; }),
