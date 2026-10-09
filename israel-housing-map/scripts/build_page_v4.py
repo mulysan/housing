@@ -90,10 +90,11 @@ def vardict():   # var_dict.py + labels from the variable map (varmap_info.json)
     lab = json.load(open('varmap_info.json')).get('labels', {}) if os.path.exists('varmap_info.json') else {}
     return json.dumps({'v': var_dict.V, 'src': var_dict.SRC, 'lab': lab}, ensure_ascii=False).replace('</', '<\\/')
 n_par = meta['n']
-def sizep():   # dwelling-size paper figures 1 and 4 (build_size_paper.py)
+def sizep():   # dwelling-size paper figures 1, 4 and 5 (build_size_paper.py)
     O = json.load(open('size_paper.json'))
     return json.dumps({'built_share': O['built_share'], 'national_series': O['national_series'],
-                       'b': O['km']['own_dt']['b'][0], 'se': O['km']['own_dt']['se'][0]}, separators=(',', ':'))
+                       'b': O['km']['own_dt']['b'][0], 'se': O['km']['own_dt']['se'][0],
+                       'km_fig': {'resid': O['km']['fig_resid'], 'longdiff': O['km']['fig_longdiff']}}, separators=(',', ':'))
 SUB = (f'{round(n_par/1000)} אלף חלקות מגורים, כולל יהודה ושומרון. גזטיר הנכסים של מפ"י, עסקאות רשות המסים ו־govmap '
        '(1998 עד ספטמבר 2026), חלקות קדסטר, שכבות הלמ"ס ורשת הרחובות של OpenStreetMap.')
 fill = {'/*META*/': json.dumps(meta, ensure_ascii=False), '/*PTS*/': pts, '/*GUSH*/': json.dumps(gush, separators=(',', ':')),

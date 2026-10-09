@@ -471,6 +471,16 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       <div class="chart"><h3>מחיר יחסי למ"ר, באיכות קבועה, באותו חישוב (1998 = 0)</h3><div class="key"><span><i style="background:var(--k1)"></i>1–2 חדרים</span><span><i style="background:var(--k2)"></i>3</span><span><i style="background:var(--k3)"></i>4</span><span><i style="background:var(--k4)"></i>5+</span></div>
         <svg id="szrp" viewBox="0 0 560 240" role="img" aria-label="מחיר יחסי לפי גודל"></svg></div>
     </div>
+    <h3 style="margin-top:18px">השפעת ההיצע על המחיר, בין גדלי דירה: שלוש דרכים להסתכל</h3>
+    <p class="lede" id="szkmlede"></p>
+    <div class="two">
+      <div class="chart"><h3>(א) בתוך כל שוק, אחרי אפקט מחוז×שנה ואפקט שוק: מחיר מול מלאי (שאריות)</h3><div class="key"><span><i style="background:var(--k1)"></i>1–2 חדרים</span><span><i style="background:var(--k2)"></i>3</span><span><i style="background:var(--k3)"></i>4</span><span><i style="background:var(--k4)"></i>5+</span></div>
+        <svg id="szkmA" viewBox="0 0 560 300" role="img" aria-label="שאריות מחיר מול שאריות מלאי"></svg></div>
+      <div class="chart"><h3>(ב) הפרשים ארוכים 1998→2019, 24 שווקים של מחוז×גודל (ביחס לממוצע המחוז)</h3><div class="key"><span><i style="background:var(--k1)"></i>1–2 חדרים</span><span><i style="background:var(--k2)"></i>3</span><span><i style="background:var(--k3)"></i>4</span><span><i style="background:var(--k4)"></i>5+</span></div>
+        <svg id="szkmB" viewBox="0 0 560 300" role="img" aria-label="הפרשים ארוכים"></svg></div>
+    </div>
+    <div class="chart"><h3>(ג) כל הארץ, 5+ חדרים מול 1–2 חדרים: מחיר יחסי מול מלאי יחסי, שנה אחר שנה</h3>
+      <svg id="szkmC" viewBox="0 0 1120 300" role="img" aria-label="מסלול ארצי של מחיר יחסי מול מלאי יחסי"></svg></div>
     <p class="lede" style="font-size:12.5px" id="sznote"></p>
     <div class="method"><b>איך זה חושב</b>
       <div class="eq" dir="ltr">ln <i>P<sub>jt</sub></i> = θ<sub><i>t</i></sub> + δ<sub><i>j</i></sub> + γ<sub><i>j</i></sub><i>t</i> − (1/σ)·ln <i>S</i><sub><i>j</i>,<i>t</i>−1</sub> + <i>u<sub>jt</sub></i></div>
@@ -1202,6 +1212,44 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       const opt = (y0, y1, yt) => ({ x0:1998, x1:2020, y0, y1, yt, xt:[1998,2002,2006,2010,2014,2018,2020], base:0, yf: v => (v > 0 ? '+' : '') + Math.round(v*100), l: 40 });
       lineChart('szrs', SZ.map((z, k) => ({ cls: CLS[k], pts: rel(ls, z) })), opt(-0.4, 0.4, [-0.4,-0.2,0,0.2,0.4]));
       lineChart('szrp', SZ.map((z, k) => ({ cls: CLS[k], pts: rel(th, z) })), opt(-0.1, 0.1, [-0.1,-0.05,0,0.05,0.1]));
+      { const K = SP.km_fig, CV = ['var(--k1)','var(--k2)','var(--k3)','var(--k4)'], SZI = {'1-2':0,'3':1,'4':2,'5+':3};
+        const sc = (id, pts, lines, o) => { const el = document.getElementById(id), vb = el.viewBox.baseVal, W = vb.width, H = vb.height, L0 = 50, R0 = 14, T0 = 12, B = 40;
+          const xs = pts.map(p => p.x), ys = pts.map(p => p.y), x0 = o.x0 ?? Math.min(...xs), x1 = o.x1 ?? Math.max(...xs), y0 = o.y0 ?? Math.min(...ys), y1 = o.y1 ?? Math.max(...ys);
+          const X = v => L0 + (v - x0)/(x1 - x0)*(W - L0 - R0), Y = v => H - B - (v - y0)/(y1 - y0)*(H - T0 - B);
+          let s = '';
+          o.yt.forEach(t => { s += `<line class="grid" x1="${L0}" x2="${W-R0}" y1="${Y(t)}" y2="${Y(t)}"${t===0?' style="stroke:var(--muted)"':''}></line><text x="${L0-6}" y="${Y(t)+4}" text-anchor="end">${Math.round(t*100)}</text>`; });
+          o.xt.forEach(t => { s += `<text x="${X(t)}" y="${H-B+16}" text-anchor="middle">${Math.round(t*100)}</text>`; });
+          s += `<text x="${(W+L0)/2}" y="${H-4}" text-anchor="middle">${o.xlab}</text><text x="${L0+4}" y="${T0+2}" text-anchor="start" style="font-size:11px">${o.ylab}</text>`;
+          if (o.path) s += `<path d="${pts.map((p, i) => (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join('')}" style="fill:none;stroke:var(--k1);stroke-width:2"></path>`;
+          pts.forEach(p => { s += `<g class="h"><title>${p.t}</title><circle cx="${X(p.x)}" cy="${Y(p.y)}" r="${p.r}" style="fill:${p.c};opacity:${p.o ?? 0.8};stroke:#fff;stroke-width:${p.r > 3 ? 0.8 : 0}"></circle>` +
+            (p.lab ? `<text x="${X(p.x)+5}" y="${Y(p.y)-6}" style="font-size:10.5px;fill:var(--muted)">${p.lab}</text>` : '') + '</g>'; });
+          lines.forEach(l => { s += `<line x1="${X(l.x0)}" x2="${X(l.x1)}" y1="${Y(l.a + l.b*l.x0)}" y2="${Y(l.a + l.b*l.x1)}" style="stroke:${l.c};stroke-width:2${l.dash ? ';stroke-dasharray:5 3' : ''}"></line>`; });
+          (o.notes || []).forEach((n, i) => { s += `<text x="${W-R0-4}" y="${T0+14+i*15}" text-anchor="end" style="font-size:11.5px">${n}</text>`; });
+          el.innerHTML = s; el.querySelectorAll('text').forEach(fixBidi); };
+        const R = K.resid, b = R.slope, P = R.pts;
+        const pa = P.x.map((x, i) => ({ x, y: P.y[i], r: 2.2, o: 0.4, c: CV[SZI[P.sz[i]]], t: `${P.dist[i]}, ${P.sz[i]} חדרים, ${P.t[i]}` }))
+          .concat(R.bins.x.map((x, i) => ({ x, y: R.bins.y[i], r: 4.5, o: 1, c: 'var(--fg)', t: 'ממוצע קבוצה' })));
+        sc('szkmA', pa, [{ a: 0, b, x0: -0.25, x1: 0.27, c: 'var(--warm)' }],
+          { x0: -0.26, x1: 0.28, y0: -0.1, y1: 0.1, yt: [-0.1,-0.05,0,0.05,0.1], xt: [-0.2,-0.1,0,0.1,0.2], xlab: 'לוג מלאי, שארית (×100)', ylab: 'לוג מחיר למ"ר, שארית (×100)',
+            notes: [`שיפוע ${b.toFixed(3)} (${R.se.toFixed(3)}), σ ≈ ${Math.round(1/Math.abs(b))}`, 'נקודות שחורות: ממוצעים ב־20 קבוצות'] });
+        const L = K.longdiff, mS = Math.max(...L.S);
+        const wm = (v, w) => v.reduce((a, x, i) => a + x*w[i], 0) / w.reduce((a, x) => a + x, 0), a_ = wm(L.dP, L.S) - L.slope*wm(L.dS, L.S);
+        sc('szkmB', L.dS.map((x, i) => ({ x, y: L.dP[i], r: 3 + 8*Math.sqrt(L.S[i]/mS), c: CV[SZI[L.sz[i]]], t: `${L.dist[i]}, ${L.sz[i]} חדרים: מלאי ${(x*100).toFixed(0)}, מחיר ${(L.dP[i]*100).toFixed(1)}` })),
+          [{ a: a_, b: L.slope, x0: -0.4, x1: 0.52, c: 'var(--warm)' }, { a: 0, b, x0: -0.4, x1: 0.52, c: 'var(--muted)', dash: true }],
+          { x0: -0.42, x1: 0.55, y0: -0.1, y1: 0.1, yt: [-0.1,-0.05,0,0.05,0.1], xt: [-0.4,-0.2,0,0.2,0.4], xlab: 'שינוי בלוג המלאי 1997→2018 (×100)', ylab: 'שינוי בלוג המחיר 1998→2019 (×100)',
+            notes: [`שיפוע בפועל ${L.slope >= 0 ? '+' : ''}${L.slope.toFixed(3)}`, `מקווקו: ${b.toFixed(3)}`] });
+        const th = {}, ls = {}; ['1-2','5+'].forEach(z => { th[z] = {}; ls[z] = {}; ns[z].t.forEach((t, i) => { th[z][t] = ns[z].theta[i]; ls[z][t] = ns[z].lS[i]; }); });
+        const TT = ns['1-2'].t.filter(t => t in th['5+']), rs = TT.map(t => ls['5+'][t] - ls['1-2'][t] - (ls['5+'][TT[0]] - ls['1-2'][TT[0]])), rp = TT.map(t => th['5+'][t] - th['1-2'][t] - (th['5+'][TT[0]] - th['1-2'][TT[0]]));
+        const i5 = TT.indexOf(2005);
+        sc('szkmC', TT.map((t, i) => ({ x: rs[i], y: rp[i], r: 3.5, c: 'var(--k1)', lab: [1998,2002,2005,2008,2011,2014,2017,2020].includes(t) ? String(t) : '', t: `${t}: מלאי ${(rs[i]*100).toFixed(0)}, מחיר ${(rp[i]*100).toFixed(1)}` })),
+          [{ a: rp[i5] - b*rs[i5], b, x0: rs[i5], x1: rs[rs.length-1], c: 'var(--muted)', dash: true }],
+          { x0: -0.02, x1: 0.75, y0: -0.1, y1: 0.2, yt: [-0.1,-0.05,0,0.05,0.1,0.15,0.2], xt: [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7], path: true,
+            xlab: 'מלאי יחסי, 5+ מול 1–2 חדרים (לוג ×100, 1998 = 0)', ylab: 'מחיר יחסי למ"ר (לוג ×100, 1998 = 0)', notes: [`מקווקו: שיפוע ${b.toFixed(3)} מ־2005`] });
+        document.getElementById('szkmlede').textContent =
+          `(א) היא השונות שמזהה את האומדן: שנים שבהן המלאי של גודל מסוים גדל מהר מהרגיל שלו, ביחס לגדלים האחרים באותו מחוז. הקשר שלילי, ${b.toFixed(3)}. `+
+          `(ב) בהפרשים של עשרים שנה אין קשר (${L.slope >= 0 ? '+' : ''}${L.slope.toFixed(2)}): השווקים שהמלאי שלהם גדל יותר לא הוזלו יחסית. כמו בפירוש של Katz ו־Murphy, הביקוש היחסי לדירות גדולות גדל בערך בקצב ההיצע שלהן, כנראה עם עליית ההכנסות. `+
+          `(ג) במסלול הארצי יש שני שלבים: ב־1998–2005 ההיצע היחסי של הדירות הגדולות והמחיר היחסי שלהן עלו יחד (ביקוש); ב־2005–2017 ההיצע היחסי עלה בעוד כ־40 נקודות לוג והמחיר היחסי ירד בכ־25. תרשים 5 במאמר.`;
+      }
       const y0 = b.y.indexOf(1950), yp = b.y.indexOf(2012);
       document.getElementById('szlede').textContent =
         `ב־1950 כ־${Math.round(b['1-2'][y0]*100)}% מהדירות החדשות היו בנות 1–2 חדרים ו־${Math.round(b['5+'][y0]*100)}% בנות 5 חדרים ומעלה. מאמצע שנות ה־80 דירות 1–2 חדרים הן כ־3% מהבנייה, ודירות 5+ הגיעו ל־${Math.round(b['5+'][yp]*100)}% ב־2012. `+
