@@ -294,12 +294,12 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     <h2>השטח הרשום של אותה דירה גדל ב־10%</h2>
     <p class="callout" id="driftlede"></p>
     <div class="two">
-      <div class="chart"><h3>שטח רשום של אותה דירה, מול 2015</h3><svg id="drift" viewBox="0 0 560 230" role="img" aria-label="שינוי בשטח הרשום"></svg></div>
+      <div class="chart"><h3>שטח רשום של אותה דירה, מול 2015</h3><div class="key"><span><i style="background:var(--accent)"></i>כל הבניינים</span><span><i style="background:var(--warm)"></i>נבנו מ־1990 (לא זכאים לתמ"א 38)</span><span><i style="background:var(--nodata)"></i>נבנו לפני 1980</span></div><svg id="drift" viewBox="0 0 560 230" role="img" aria-label="שינוי בשטח הרשום"></svg></div>
       <div class="chart"><h3>שטח ממוצע של דירה שנמכרה (מ"ר), לפי שנת בנייה</h3>
         <div class="key"><span><i style="background:var(--accent)"></i>מ"ר</span><span><i style="background:var(--warm)"></i>מ"ר לחדר ×4</span></div>
         <svg id="built" viewBox="0 0 560 230" role="img" aria-label="שטח לפי שנת בנייה"></svg></div>
     </div>
-    <div class="method"><b>איך זה חושב</b><div class="eq" dir="ltr">ln m²<sub><i>it</i></sub> = θ<sub><i>y</i>(<i>t</i>)</sub> + α<sub><i>d</i>(<i>i</i>)</sub> + ε<sub><i>it</i></sub>,   drift<sub><i>y</i></sub> = exp(θ̂<sub><i>y</i></sub> − θ̂<sub>2015</sub>) − 1</div><p>על מכירות חוזרות של אותה דירה (<i>d</i>), עם אפקט קבוע לשנה. דירה לא גדלה, אז כל שינוי ב־θ הוא שינוי ברישום. התרשים הימני: ממוצע השטח ומ"ר לחדר לפי שנת הבנייה, בלי רגרסיה.</p></div>
+    <div class="method"><b>איך זה חושב</b><div class="eq" dir="ltr">ln m²<sub><i>it</i></sub> = θ<sub><i>y</i>(<i>t</i>)</sub> + α<sub><i>d</i>(<i>i</i>)</sub> + ε<sub><i>it</i></sub>,   drift<sub><i>y</i></sub> = exp(θ̂<sub><i>y</i></sub> − θ̂<sub>2015</sub>) − 1</div><p>על מכירות חוזרות של אותה דירה (<i>d</i>), עם אפקט קבוע לשנה. אם הדירה לא השתנתה, כל שינוי ב־θ הוא שינוי ברישום. אבל דירה יכולה לגדול: תמ"א 38 מוסיפה ממ"ד ומרפסת, ושיפוצים מוסיפים חדר. לכן הסדרה מוצגת גם בנפרד לבניינים שנבנו מ־1990 ואילך (לא זכאים לתמ"א 38) ולבניינים מלפני 1980. התרשים הימני: ממוצע השטח ומ"ר לחדר לפי שנת הבנייה, בלי רגרסיה.</p></div>
   </section>
 
   <section>
@@ -1012,11 +1012,12 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
   document.getElementById('dealslede').textContent = `השיא: ${peak[0]}, עם ${fmt(peak[1])} עסקאות. הקפיצות בסוף שנים מסוימות מתאימות לשינויים במס רכישה. אחרי יוני 2026 הנתונים חלקיים בגלל דיווח מאוחר, ולכן הם לא מוצגים.`;
 
   const AD = T.area_drift;
-  lineChart('drift', [ { cls:'ln', end:true, pts: AD.map(r => [r[0], r[1]*100]) } ],
+  const ADN = T.area_drift_new || [], ADO = T.area_drift_old || [];
+  lineChart('drift', [ { cls:'ln', end:true, pts: AD.map(r => [r[0], r[1]*100]) }, { cls:'ln2', pts: ADN.map(r => [r[0], r[1]*100]) }, { cls:'ln3', pts: ADO.map(r => [r[0], r[1]*100]) } ],
     { x0:1998, x1:2025, y0:-4, y1:10, yt:[-4,-2,0,2,4,6,8,10], xt:[1998,2003,2008,2013,2018,2025], base:0, yf: v => (v>0?'+':'') + v.toFixed(0) + '%', l: 40 });
   const dd = (AD.find(r => r[0] === 2024)[1] - AD.find(r => r[0] === 2012)[1]) * 100;
   document.getElementById('driftlede').textContent =
-    `כשאותה דירה נמכרת שוב, השטח שנרשם לה ברשות המסים גדל בכ־${dd.toFixed(0)}% בין 2012 ל־2024, בלי שינוי עד 2012. דירות לא גדלות מעצמן, אז כנראה השתנה האופן שבו מודדים או מדווחים שטח (למשל ברוטו במקום נטו, או מרפסות). המשמעות: מחיר למ"ר שמחושב משטח רשום מראה עלייה קטנה מדי אחרי 2013. במדדים כאן יש אפקט קבוע לשטח מעוגל, אז ההשוואה היא בין עסקאות עם אותו שטח רשום. את ההסבר עוד צריך לבדוק.`;
+    `כשאותה דירה נמכרת שוב, השטח שנרשם לה ברשות המסים גדל בכ־${dd.toFixed(0)}% בין 2012 ל־2024, בלי שינוי עד 2012. דירה יכולה לגדול באמת (תמ"א 38 מוסיפה ממ"ד ומרפסת לבניינים מלפני 1980, ושיפוצים מוסיפים חדרים), אבל בבניינים שנבנו מ־1990 ואילך, שאינם זכאים לתמ"א 38, העלייה זהה: ${ADN.length ? Math.round((ADN.find(r => r[0] === 2024) || [0, 0])[1]*100) : '—'}% מ־2015 עד 2024, מול ${ADO.length ? Math.round((ADO.find(r => r[0] === 2024) || [0, 0])[1]*100) : '—'}% בבניינים מלפני 1980. לכן כנראה השתנה האופן שבו מודדים או מדווחים שטח (למשל ברוטו במקום נטו, או מרפסות). המשמעות: מחיר למ"ר שמחושב משטח רשום מראה עלייה קטנה מדי אחרי 2013. במדדים כאן יש אפקט קבוע לשטח מעוגל, אז ההשוואה היא בין עסקאות עם אותו שטח רשום. את ההסבר עוד צריך לבדוק.`;
 
   const BB = T.by_built.filter(r => r[4] >= 300);
   lineChart('built', [ { cls:'ln', pts: BB.map(r => [r[0], r[1]]) }, { cls:'ln2', pts: BB.map(r => [r[0], r[3]*4]) } ],
@@ -1286,8 +1287,19 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
   { const FG0 = J('floorg-data'); const drawFG = src => { const FG = src === 'v' ? { groups: FG0.groups_votes, height: FG0.height_votes } : FG0, GR = [['אחר','k1','אחר'],['חרדי','k2','חרדי'],['ערבי','k3','ערבי']];
     const pct1 = v => (v > 0 ? '+' : '') + (v*100).toFixed(1) + '%';
     document.getElementById('fgkey').innerHTML = GR.map(([g,k,l]) => `<span><i style="background:var(--${k})"></i>${l} (${fmt(FG.groups[g].n)} עסקאות)</span>`).join('');
-    const ser = GR.map(([g,k]) => ({ cls:k, end:true, pts: Object.entries(FG.groups[g].floor).map(([f,v]) => [+f, v[2] >= 150 ? v[0]*100 : null]).filter(p => p[0] <= 12 && p[1] != null).sort((a,b) => a[0]-b[0]) }));
-    lineChart('fgline', ser, { x0:0, x1:12, y0:-6, y1:12, yt:[-5,0,5,10], xt:[0,2,4,6,8,10,12], base:0, yf: v => (v > 0 ? '+' : '') + v + '%', xf: v => v === 0 ? 'קרקע' : v, l:42 });
+    const ser = GR.map(([g,k]) => ({ cls:k, pts: Object.entries(FG.groups[g].floor).map(([f,v]) => [+f, v[2] >= 150 ? v[0]*100 : null]).filter(p => p[0] <= 12 && p[1] != null).sort((a,b) => a[0]-b[0]) }));
+    const FGO = { x0:0, x1:12.8, y0:-6, y1:12, yt:[-5,0,5,10], xt:[0,2,4,6,8,10,12], base:0, yf: v => (v > 0 ? '+' : '') + v + '%', xf: v => v === 0 ? 'קרקע' : v, l:42 };
+    document.getElementById('fgline').setAttribute('viewBox', '0 0 560 270');   // reset: the end labels below enlarge it
+    lineChart('fgline', ser, FGO);
+    // end labels: group name and value in the series colour, pushed apart so they do not overlap
+    { const el = document.getElementById('fgline'), vb = el.viewBox.baseVal, W = vb.width, H = vb.height, L0 = 42, R0 = 10, T0 = 14, B = 24;
+      const x = v => L0 + (v - FGO.x0)/(FGO.x1 - FGO.x0)*(W - L0 - R0), y = v => H - B - (v - FGO.y0)/(FGO.y1 - FGO.y0)*(H - T0 - B);
+      const ends = ser.map((se, i) => { const p = se.pts[se.pts.length - 1]; return p ? { i, px: x(p[0]), py: y(p[1]), v: p[1], lab: GR[i][2], k: GR[i][1] } : null; }).filter(Boolean).sort((a, b) => a.py - b.py);
+      for (let j = 1; j < ends.length; j++) if (ends[j].py - ends[j-1].py < 14) ends[j].py = ends[j-1].py + 14;
+      let t = '';
+      ends.forEach(e => { t += `<circle cx="${e.px}" cy="${y(e.v)}" r="3.5" style="fill:var(--${e.k})"></circle><text x="${e.px - 7}" y="${e.py + 4}" text-anchor="end" style="fill:var(--${e.k});font-weight:600">${e.lab} ${(e.v > 0 ? '+' : '') + e.v.toFixed(1)}%</text>`; });
+      t += `<text x="${(W + L0)/2}" y="${H + 12}" text-anchor="middle">קומת הדירה</text>`;
+      el.insertAdjacentHTML('beforeend', t); el.setAttribute('viewBox', `0 0 ${W} ${H + 16}`); }
     const HB = ['1–2','3–4','5–8','9–12','13–20','21–30','31+'], A = FG.height['הכול'];
     barChart('fgh', HB, [{ cls:'a', label:true, vals: HB.map(h => A.with_floor[h] ? A.with_floor[h][0] : null) },
                          { cls:'b', label:false, vals: HB.map(h => A.no_floor[h] ?? null) }],

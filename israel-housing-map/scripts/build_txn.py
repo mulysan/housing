@@ -91,6 +91,14 @@ d5 = rs[rs.y <= 2025]
 fes, _ = fe_solve(np.log(d5.area.values), [codes(d5.y), codes(d5.apt)])
 labs = pd.factorize(d5.y)[1]; s = pd.Series(fes[0], index=labs).sort_index(); s = s - s.get(2015)
 out['area_drift'] = [[int(k), round(float(np.exp(x)-1), 4)] for k, x in s.items()]
+# 5b. Dwellings can grow (TAMA 38 adds a safe room and balcony to pre-1980 buildings; renovations), so the
+#     drift is split by building year: built 1990+ (not eligible for TAMA 38) vs built before 1980. If the
+#     drift is a recording change it should appear in both; if it is real enlargement, mainly in the old.
+for nm_, msk in [('area_drift_new', d5.yb >= 1990), ('area_drift_old', d5.yb < 1980)]:
+    dd_ = d5[msk]; dd_ = dd_[dd_.groupby('apt').apt.transform('size') >= 2]
+    f_, _ = fe_solve(np.log(dd_.area.values), [codes(dd_.y), codes(dd_.apt)])
+    s_ = pd.Series(f_[0], index=pd.factorize(dd_.y)[1]).sort_index(); s_ = s_ - s_.get(2015)
+    out[nm_] = [[int(k), round(float(np.exp(x)-1), 4)] for k, x in s_.items()]
 
 # 6. city indices: apartment + area FE, annual, real, 2015=100
 top = df.groupby('city').size().sort_values(ascending=False).head(20).index
