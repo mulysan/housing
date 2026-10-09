@@ -461,6 +461,17 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     </div>
     <div class="tablewrap" style="max-height:none;margin-top:12px"><table style="font-size:12.5px" id="kmgtab"></table></div>
     <p class="lede" style="font-size:12.5px" id="kmgnote"></p>
+    <h3 style="margin-top:22px">גודל הדירה: מה נבנה, ומה קרה למחיר היחסי</h3>
+    <p class="lede" id="szlede"></p>
+    <div class="chart"><h3>חלק הדירות שנבנו בכל שנה, לפי מספר חדרים (ממוצע נע של 3 שנים)</h3><div class="key"><span><i style="background:var(--k1)"></i>1–2 חדרים</span><span><i style="background:var(--k2)"></i>3</span><span><i style="background:var(--k3)"></i>4</span><span><i style="background:var(--k4)"></i>5+</span></div>
+      <svg id="szbuilt" viewBox="0 0 1120 260" role="img" aria-label="הרכב הבנייה לפי גודל דירה"></svg></div>
+    <div class="two">
+      <div class="chart"><h3>מלאי יחסי: לוג המלאי של כל גודל פחות הממוצע על פני הגדלים (1998 = 0)</h3><div class="key"><span><i style="background:var(--k1)"></i>1–2 חדרים</span><span><i style="background:var(--k2)"></i>3</span><span><i style="background:var(--k3)"></i>4</span><span><i style="background:var(--k4)"></i>5+</span></div>
+        <svg id="szrs" viewBox="0 0 560 240" role="img" aria-label="מלאי יחסי לפי גודל"></svg></div>
+      <div class="chart"><h3>מחיר יחסי למ"ר, באיכות קבועה, באותו חישוב (1998 = 0)</h3><div class="key"><span><i style="background:var(--k1)"></i>1–2 חדרים</span><span><i style="background:var(--k2)"></i>3</span><span><i style="background:var(--k3)"></i>4</span><span><i style="background:var(--k4)"></i>5+</span></div>
+        <svg id="szrp" viewBox="0 0 560 240" role="img" aria-label="מחיר יחסי לפי גודל"></svg></div>
+    </div>
+    <p class="lede" style="font-size:12.5px" id="sznote"></p>
     <div class="method"><b>איך זה חושב</b>
       <div class="eq" dir="ltr">ln <i>P<sub>jt</sub></i> = θ<sub><i>t</i></sub> + δ<sub><i>j</i></sub> + γ<sub><i>j</i></sub><i>t</i> − (1/σ)·ln <i>S</i><sub><i>j</i>,<i>t</i>−1</sub> + <i>u<sub>jt</sub></i></div>
       <div class="eq" dir="ltr"><i>N<sub>jt</sub></i> = Σ<sub><i>i</i>∈<i>j</i>, built≤<i>t</i></sub> 1,   <i>F<sub>jt</sub></i> = Σ m²<sub><i>i</i></sub>,   <i>E<sub>jt</sub></i> = Σ <i>v<sub>i</sub></i>/<i>v̄</i></div>
@@ -536,6 +547,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
 <!--REPORT--><script type="application/json" id="floorg-data">/*FLOORG*/</script><!--/REPORT-->
 <!--REPORT--><script type="application/json" id="km-data">/*KM*/</script><!--/REPORT-->
 <!--REPORT--><script type="application/json" id="kmg-data">/*KMG*/</script><!--/REPORT-->
+<!--REPORT--><script type="application/json" id="sz-data">/*SIZEP*/</script><!--/REPORT-->
 <!--REPORT--><script type="application/json" id="hed-data">/*HED*/</script><!--/REPORT-->
 <script type="application/json" id="areas-data">/*AREAS*/</script>
 <script type="application/json" id="vardict">/*VARDICT*/</script>
@@ -1179,6 +1191,24 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       `<tr>${'<th class="num">−1/σ (se)</th><th class="num">R² פנימי</th>'.repeat(3)}<th class="num">−1/σ (se)</th><th class="num">R² פנימי</th><th class="num">שיפוע (se)</th><th class="num">R²</th><th class="num">שיפוע (se)</th><th class="num">R²</th></tr></thead><tbody>` +
       W3.map(([w, lab]) => `<tr><td>${lab}</td>${cellm(M[w+'_fe'])}${cellm(M[w+'_trend'])}${cellm(M[w+'_fe_iv'])}${cellm(MT[w+'_fe'])}${cellc(T.long_diff[w])}${cellc(CR[w])}</tr>`).join('') + '</tbody>';
     const gc = C.growth_corr;
+    { const SP = J('sz-data'), SZ = ['1-2','3','4','5+'], CLS = ['k1','k2','k3','k4'], b = SP.built_share;
+      const ma = v => v.map((x, i) => (i === 0 || i === v.length - 1) ? x : (v[i-1] + x + v[i+1])/3);
+      lineChart('szbuilt', SZ.map((z, k) => { const m = ma(b[z]); return { cls: CLS[k], pts: b.y.map((t, i) => [t, m[i]]) }; }),
+        { x0:1950, x1:2019, y0:0, y1:0.6, yt:[0,0.1,0.2,0.3,0.4,0.5,0.6], xt:[1950,1960,1970,1980,1990,2000,2010,2019], base:0, yf: v => Math.round(v*100) + '%', l: 44 });
+      const ns = SP.national_series, th = {}, ls = {};
+      SZ.forEach(z => { th[z] = {}; ls[z] = {}; ns[z].t.forEach((t, i) => { th[z][t] = ns[z].theta[i]; ls[z][t] = ns[z].lS[i]; }); });
+      const T = ns['1-2'].t.filter(t => SZ.every(z => t in th[z]));
+      const rel = (D, z) => { const r = T.map(t => D[z][t] - SZ.reduce((a, o) => a + D[o][t], 0)/SZ.length); return T.map((t, i) => [t, r[i] - r[0]]); };
+      const opt = (y0, y1, yt) => ({ x0:1998, x1:2020, y0, y1, yt, xt:[1998,2002,2006,2010,2014,2018,2020], base:0, yf: v => (v > 0 ? '+' : '') + Math.round(v*100), l: 40 });
+      lineChart('szrs', SZ.map((z, k) => ({ cls: CLS[k], pts: rel(ls, z) })), opt(-0.4, 0.4, [-0.4,-0.2,0,0.2,0.4]));
+      lineChart('szrp', SZ.map((z, k) => ({ cls: CLS[k], pts: rel(th, z) })), opt(-0.1, 0.1, [-0.1,-0.05,0,0.05,0.1]));
+      const y0 = b.y.indexOf(1950), yp = b.y.indexOf(2012);
+      document.getElementById('szlede').textContent =
+        `ב־1950 כ־${Math.round(b['1-2'][y0]*100)}% מהדירות החדשות היו בנות 1–2 חדרים ו־${Math.round(b['5+'][y0]*100)}% בנות 5 חדרים ומעלה. מאמצע שנות ה־80 דירות 1–2 חדרים הן כ־3% מהבנייה, ודירות 5+ הגיעו ל־${Math.round(b['5+'][yp]*100)}% ב־2012. `+
+        `מאז 1998 המלאי של הדירות הגדולות גדל מהר בהרבה מזה של הקטנות, אבל המחיר למ"ר היחסי זז מעט: מקדם Katz–Murphy בין גדלים, עם אפקט מחוז×שנה, הוא ${SP.b.toFixed(3)} (${SP.se.toFixed(3)}), כלומר σ ≈ ${Math.round(1/Math.abs(SP.b))}.`;
+      document.getElementById('sznote').textContent =
+        'מקור: גזטיר הנכסים של מפ"י (שנת בנייה ומספר יחידות), גודל הדירה מיוחס לפי עסקאות רשות המסים ו־govmap באותה תת־חלקה, חלקה, גוש או עיר. המחיר: מקדם שנה לכל גודל ממודל אפקט קבוע לבניין (לוג מחיר למ"ר ריאלי). המלאי היחסי והמחיר היחסי הם הסטייה מהממוצע על פני ארבעת הגדלים, כך ששינוי משותף לכל השוק מתבטל. תרשימים 1 ו־4 במאמר על גודל הדירה.';
+    }
     { const KG = J('kmg-data'), RS = KG.results, SZ = KG.sizes, CLS = ['k1','k2','k3','k4'];
       const il = RS.find(r => r.geo === 'IL' && r.per === 'annual');
       if (il && il.series) {
