@@ -149,6 +149,48 @@ for pn, (a_, b_) in PER.items():
     grad[pn] = {'rooms': {int(k_): round(float(np.exp(g_[k_]) - 1), 4) for k_ in range(1, 8) if (d.rc == k_).sum() > 100},
                 'm2': {k_: round(float(np.exp(gm.get(k_, np.nan)) - 1), 4) for k_ in MBL}, 'n': int(len(d))}
     print('  gradient', pn, grad[pn]['rooms'], flush=True)
+# fine m2 bins (10 m2, 30-200), building x year FE, three sale periods; reference 80-90 m2 (paper figure 2)
+MB2 = list(range(30, 201, 10)); MB2L = [f'{a_}-{a_ + 10}' for a_ in MB2[:-1]]
+fine = {}
+for pn, (a_, b_) in {'1998-2007': (1998, 2007), '2008-2016': (2008, 2016), '2017-2025': (2017, 2025)}.items():
+    d = A[A.y.between(a_, b_) & A.area.between(30, 200, inclusive='left')].copy()
+    d['b2'] = pd.cut(d.area, MB2, labels=MB2L, right=False).astype(str)
+    d = d[d.groupby('bld').bld.transform('size') >= 2]
+    by = codes(d.bld.astype(str) + '#' + d.y.astype(str))
+    bi = pd.Categorical(d.b2, categories=MB2L).codes.astype(int)
+    fes, _ = fe_solve(d.lp.values, [bi, by]); f_ = fes[0] - fes[0][MB2L.index('80-90')]
+    nb_ = np.bincount(bi, minlength=len(MB2L))
+    fine[pn] = {'bins': MB2L, 'mid': [a_ + 5 for a_ in MB2[:-1]], 'g': [round(float(v), 4) if n_ >= 200 else None for v, n_ in zip(f_, nb_)],
+                'n': nb_.tolist(), 'N': int(len(d))}
+    print('  fine m2 gradient', pn, dict(zip(MB2L, fine[pn]['g'])), flush=True)
+grad['m2_fine'] = fine
+# OLS vs IV picture by period (paper figure 2): log price per m2 and log area net of building and year
+# effects; OLS = 20 equal-count bins of residual log area; IV = means by rooms (rounded up, 1..7+), whose
+# weighted slope equals the 2SLS estimate with room dummies as instruments. Slopes are d ln(p/m) / d ln m.
+ovi = {}
+for pn, (a_, b_) in {'1998-2007': (1998, 2007), '2008-2016': (2008, 2016), '2017-2025': (2017, 2025)}.items():
+    d = A[A.y.between(a_, b_) & A.rc.notna()].copy()
+    d = d[d.groupby('bld').bld.transform('size') >= 2]
+    gs_ = [codes(d.bld), codes(d.y)]
+    la = np.log(d.area.values)
+    _, ry = fe_solve(d.lp.values.astype(float), gs_); _, rx = fe_solve(la.astype(float), gs_)
+    g = codes(d.bld); G = g.max() + 1
+    bo = (rx @ ry) / (rx @ rx); eo = ry - bo * rx
+    se_o = np.sqrt((np.bincount(g, rx * eo, minlength=G) ** 2).sum()) / (rx @ rx)
+    R = np.minimum(d.rc.values.astype(int), 7)
+    Zd = pd.get_dummies(R).values.astype(float)
+    Zr = np.column_stack([fe_solve(Zd[:, k_].copy(), gs_)[1] for k_ in range(Zd.shape[1])])
+    xh = Zr @ np.linalg.lstsq(Zr, rx, rcond=None)[0]
+    bi_ = (xh @ ry) / (xh @ rx); ei = ry - bi_ * rx
+    se_i = np.sqrt((np.bincount(g, xh * ei, minlength=G) ** 2).sum()) / (xh @ rx)
+    o = np.argsort(rx); bins_ = np.array_split(o, 20)
+    rm = pd.DataFrame({'R': R, 'x': rx, 'y': ry}).groupby('R').agg(x=('x', 'mean'), y=('y', 'mean'), n=('x', 'size'))
+    ovi[pn] = {'ols': [round(float(bo), 4), round(float(se_o), 4)], 'iv': [round(float(bi_), 4), round(float(se_i), 4)],
+               'bins': [[round(float(rx[b].mean()), 4), round(float(ry[b].mean()), 4)] for b in bins_],
+               'rooms': [[int(r_), round(float(v.x), 4), round(float(v.y), 4), int(v.n)] for r_, v in rm.iterrows()],
+               'n': int(len(d)), 'buildings': int(G)}
+    print('  OLS/IV', pn, ovi[pn]['ols'], ovi[pn]['iv'], ovi[pn]['n'], flush=True)
+grad['ols_iv_by_period'] = ovi
 OUT['gradient_within_building_year'] = grad
 # district-specific within building x year rooms gradients (2013-2019), size classes 1-2/3/4/5+ (vs 4)
 gd_ = {}
