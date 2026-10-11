@@ -19,6 +19,9 @@ for v in ['junc_dens', 'junc_dens_walk', 'junc_dens_cad', 'street_dens', 'deaden
     X[v] = U[v]
 X['fe'] = U.fe
 X['units'] = g.units.mean(); X['yr'] = g.yr.mean()
+_f = B[(B.n >= 3) & B.fe.notna()].assign(w1=lambda d: d.n*d.fe, w2=lambda d: d.n*d.fe**2).groupby('si')
+_N = _f.n.sum(); _v = _f.w2.sum()/_N - (_f.w1.sum()/_N)**2; _nb = _f.size(); _s2 = json.load(open('fe_noise.json'))['sigma2']
+X['fe_var'] = _v.where(_nb >= 5); X['fe_var_adj'] = (_v - _s2*_nb/_N).clip(lower=0).where(_nb >= 5)
 for d in ['d_cbd', 'd_rail', 'd_coast']: X[d] = g[d].mean()
 c = duckdb.connect('h.db', read_only=True)
 A = c.sql("select gush, parcel, dt, ppm, area, rooms, cast(yb as double) yb, cast(y as double) y from a where y between 2015 and 2025").df()
@@ -44,7 +47,8 @@ OVR = {'fe': ('אפקט הבניין (ממוצע הבניינים באזור, ל
        'd_rail': ('מרחק לתחנת רכבת או רק"ל (ק"מ, ממוצע הבניינים)', 'ק"מ'), 'd_coast': ('מרחק לחוף (ק"מ, ממוצע הבניינים)', 'ק"מ'),
        'ppm': ('מחיר למ"ר ריאלי (₪ של 2015, חציון העסקאות 2015–2025)', '₪ למ"ר'), 'area': ('שטח דירה שנמכרה (מ"ר, ממוצע 2015–2025)', 'מ"ר'),
        'rooms': ('חדרים בדירה שנמכרה (ממוצע 2015–2025)', 'חדרים'), 'age': ('גיל הבניין בעסקה (שנים, ממוצע 2015–2025)', 'שנים'),
-       'new': ('שיעור מכירות בבניין חדש (2015–2025)', 'שיעור'), 'deals': ('עסקאות דירה (2015–2025)', 'עסקאות')}
+       'new': ('שיעור מכירות בבניין חדש (2015–2025)', 'שיעור'), 'deals': ('עסקאות דירה (2015–2025)', 'עסקאות'),
+       'fe_var': ('אי־שוויון: שונות אפקט הבניין באזור', 'לוג²'), 'fe_var_adj': ('אי־שוויון: שונות אפקט הבניין, בניכוי רעש', 'לוג²')}
 SHARE = {'deadend_share', 'fourway_share', 'road_share', 'comm_share', 'parking_share', 'haredi', 'arab', 'turnout', 'pre1980', 'new'}
 sig = lambda x: None if pd.isna(x) else float(f'{x:.4g}')
 vars_ = []

@@ -919,7 +919,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       const og0 = document.createElement('optgroup'); og0.label = 'חלקה, בניין וגוש'; [...msel.options].forEach(o => og0.appendChild(o)); msel.appendChild(og0);
       const GR = [['מיקום (מרחק מהבניין)', k => /^d_/.test(k)], ['אזור סטטיסטי: רשת רחובות', k => /junc|street|deadend|fourway|orient|circuity|road_share/.test(k)],
         ['אזור סטטיסטי: צפיפות, שימושים ומסחר', k => /units_dens|pop_dens|parcel_med|mix|comm_|school/.test(k)], ['אזור סטטיסטי: תחבורה וחניה', k => /bus|parking/.test(k)],
-        ['אזור סטטיסטי: חברה והצבעה', k => /ses21|haredi|arab|turnout/.test(k)]];
+        ['אזור סטטיסטי: חברה והצבעה', k => /ses21|haredi|arab|turnout/.test(k)], ['אזור סטטיסטי: אי־שוויון בערך הבניינים', k => /fe_var/.test(k)]];
       const extra = Object.keys(METRICS).filter(k => k.startsWith('sa_') || k.startsWith('dist_'));
       for (const [lab, f] of GR) { const og = document.createElement('optgroup'); og.label = lab;
         extra.filter(k => f(k.replace(/^sa_|^dist_/, ''))).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = METRICS[k].title; og.appendChild(o); });
