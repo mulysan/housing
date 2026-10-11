@@ -393,6 +393,60 @@ OUT['construction_cost'] = {'F_nis': round(float(_F)), 'v_nis_m2': round(float(_
                             'gradient_district_2020_25': {DLAB[k_]: [round(x, 4) for x in v] for k_, v in gd2.items()}}
 print('  construction cost: F', round(_F), 'v', round(_v), 'cost-index ratio', round(CI_RATIO, 3), 'F 2017-19 costs', C_COST, '| price ratio', round(P_RATIO, 3), C_COST_P, flush=True)
 print('  c* 2023-25', cstar_now, flush=True)
+# REGIONAL CONSTRUCTION COSTS (appraisers' association, June 2025; raw/data/appraisers-construction-cost-2025).
+# Each residential building is assigned one of 16 regions (city; Tel Aviv split into north of the Yarkon /
+# centre / south-and-east by coordinates) and a type by gazetteer floors (low <= 3, high 4-8, tower 9+;
+# missing = high). District cost index r_d = units-weighted mean cost of buildings completed 1998-2025
+# relative to the national units-weighted mean (same for underground cost u_d, NIS/m2). Assumptions (author,
+# 2026-10-11): regional ratios as in 2025 throughout; years linked by the CBS input index; the developer's
+# per-dwelling cost F refers to the national average, so F_d = F x r_d. Parking: an extra dwelling may require
+# p extra spaces of ~35 m2 underground (space plus aisles and ramps), costing p x 35 x u_d; p = 0, 0.5, 1.
+RC = pd.read_csv('/home/user/-econ-research-wiki/raw/data/appraisers-construction-cost-2025/cost_by_region_2025-06.csv').set_index('region')
+CITY_REG = {**{c_: 'gush_dan' for c_ in ['חולון', 'בת ים', 'בני ברק', 'פתח תקווה', 'קריית אונו', 'אור יהודה', 'גבעת שמואל', 'יהוד-מונוסון', 'אזור', 'גני תקווה', 'סביון', 'אלעד']},
+            'רמת גן': 'ramat_gan_givatayim', 'גבעתיים': 'ramat_gan_givatayim', 'הרצלייה': 'herzliya_ramat_hasharon', 'רמת השרון': 'herzliya_ramat_hasharon',
+            **{c_: 'sharon' for c_ in ['נתניה', 'כפר סבא', 'רעננה', 'הוד השרון', 'ראש העין', 'כפר יונה', 'אבן יהודה', 'קדימה-צורן', 'תל מונד', 'צור יצחק', 'חדרה',
+                                         'אור עקיבא', 'פרדס חנה-כרכור', 'חריש', 'זכרון יעקב', 'בנימינה-גבעת עדה', 'קיסריה', 'כוכב יאיר']},
+            **{c_: 'coastal_plain' for c_ in ['ראשון לציון', 'רחובות', 'נס ציונה', 'יבנה', 'גן יבנה', 'גדרה', 'באר יעקב', 'רמלה', 'לוד', 'מזכרת בתיה', 'אשדוד',
+                                                'אשקלון', 'קריית גת', 'קריית מלאכי', 'מודיעין-מכבים-רעות', 'שוהם']},
+            **{c_: 'haifa' for c_ in ['חיפה', 'קריית מוצקין', 'קריית אתא', 'קריית ביאליק', 'קריית ים', 'טירת כרמל', 'נשר', 'עתלית', 'קרית טבעון', 'יקנעם עילית',
+                                        'רמת ישי', 'עכו', 'נהרייה']},
+            'ירושלים': 'jerusalem', **{c_: 'jerusalem_surroundings' for c_ in ['בית שמש', 'מבשרת ציון', 'צור הדסה', 'מעלה אדומים', 'גבעת זאב', 'אפרת', 'ביתר עילית']},
+            **{c_: 'beer_sheva' for c_ in ['באר שבע', 'אופקים', 'נתיבות', 'שדרות', 'מיתר', 'עומר', 'להבים']},
+            **{c_: 'negev_arava' for c_ in ['דימונה', 'ערד', 'ירוחם', 'מצפה רמון']}, 'אילת': 'eilat'}
+DIST_REG = {'תל-אביב': 'gush_dan', 'המרכז': 'sharon', 'חיפה': 'haifa', 'הצפון': 'golan_upper_galilee', 'הדרום': 'beer_sheva', 'ירושלים': 'jerusalem_surroundings',
+            'יהודה ושומרון': 'samaria'}
+Bc = pd.read_parquet('parcels_v3.parquet')[['gush', 'parcel', 'units', 'city', 'lat', 'lon', 'yr', 'fl']].merge(P[['gush', 'parcel', 'district']], on=['gush', 'parcel'])
+Bc = Bc[Bc.yr.between(1998, 2025) & Bc.district.isin(DIST) & (Bc.units > 0)].copy()
+def _reg(r):
+    if r.city == 'תל אביב -יפו':
+        if r.lat > 32.097: return 'ta_north_yarkon'
+        if r.lat < 32.055 or r.lon > 34.795: return 'ta_south_east'
+        return 'ta_center'
+    return CITY_REG.get(r.city, DIST_REG[r.district])
+Bc['reg'] = Bc.apply(_reg, axis=1)
+Bc['typ'] = np.select([Bc.fl.between(1, 3), Bc.fl >= 9], ['low', 'tower'], 'high')
+Bc['cost'] = [RC.at[g_, t_] for g_, t_ in zip(Bc.reg, Bc.typ)]; Bc['ucost'] = Bc.reg.map(RC.underground)
+nat_c = np.average(Bc.cost, weights=Bc.units); nat_u = np.average(Bc.ucost, weights=Bc.units)
+REG_IDX = {DLAB[d_]: round(float(np.average(g_.cost, weights=g_.units) / nat_c), 4) for d_, g_ in Bc.groupby('district')}
+UCOST = {DLAB[d_]: float(np.average(g_.ucost, weights=g_.units)) for d_, g_ in Bc.groupby('district')}
+CIm = pd.read_csv('/home/user/-econ-research-wiki/raw/data/construction-input-index/cbs_input_index_monthly.csv')
+_jun25 = float(CIm[(CIm.year == 2025) & (CIm.month == 6)].idx_jul2025.iloc[0])
+U24 = {k_: v * float(CI.loc[2024]) / _jun25 for k_, v in UCOST.items()}            # underground NIS/m2 in 2024 prices
+PARK_M2 = 35.0
+def c_reg(p_, year_ratio):     # per extra dwelling, NIS million, by district
+    return {k_: round((_F * REG_IDX[k_] + p_ * PARK_M2 * U24[k_]) * year_ratio / 1e6, 4) for k_ in REG_IDX}
+reg_out = {'national_mean_cost_m2': round(nat_c), 'national_mean_underground_m2': round(nat_u), 'district_index': REG_IDX,
+           'underground_2024_nis_m2': {k_: round(v) for k_, v in U24.items()}, 'parking_m2_per_space': PARK_M2,
+           'region_units_share': (Bc.groupby('reg').units.sum() / Bc.units.sum()).round(4).to_dict(),
+           'type_units_share': (Bc.groupby('typ').units.sum() / Bc.units.sum()).round(4).to_dict(), 'scenarios': {}}
+for p_ in (0.0, 0.5, 1.0):
+    c24 = c_reg(p_, 1.0); c18 = c_reg(p_, CI_RATIO)
+    reg_out['scenarios'][f'p={p_}'] = {'c_2024': c24, 'c_2017_19': c18,
+        'mu_2023_25': {k_: {s_: round(cstar_now[k_][s_] - c24[k_], 4) for s_ in ['1-2', '3']} for k_ in c24},
+        'mu_2017_19': {k_: {s_: round(cstar[k_][s_] - c18[k_], 4) for s_ in ['1-2', '3']} for k_ in c18}}
+OUT['construction_cost_regional'] = reg_out
+print('  regional cost index', REG_IDX, 'underground 2024', {k_: round(v) for k_, v in U24.items()}, flush=True)
+for p_ in (0.0, 0.5, 1.0): print(f'  p={p_} mu 2023-25', reg_out['scenarios'][f'p={p_}']['mu_2023_25'], flush=True)
 S19 = pd.DataFrame({d_: SD[d_].loc[2019] for d_ in DIST}).T[SIZES]
 S97 = pd.DataFrame({d_: SD[d_].loc[1997] for d_ in DIST}).T[SIZES]
 NEW = S19 - S97
@@ -428,7 +482,9 @@ def run_cf(b_size, s0_base, c_unit, label, search=True):
     S = S19.values.astype(float)
     res = {'b_size': b_size, 's0': s0_base, 'c': c_unit, 'hh_formation_elasticity': round(s0_base / abs(b_size), 3), 'district': {}}
     tot = {'simple': {q: {'dN': 0, 'dCS': 0, 'dPS': 0, 'dCost': 0, 'dW': 0} for q in (0.1, 0.25, 0.5)}, 'optimal': {'dN': 0, 'dCS': 0, 'dPS': 0, 'dCost': 0, 'dW': 0}}
+    cdict = c_unit if isinstance(c_unit, dict) else None
     for i, d_ in enumerate(DIST):
+        c_i = cdict[DLAB[d_]] if cdict else c_unit
         Pbar = float(np.average(Pv[i], weights=S[i])); aP = 1.0 / (Pbar * abs(b_size))
         Md = S[i].sum() / (1 - s0_base)
         xi = aP * Pv[i] + np.log(S[i] / Md) - np.log(s0_base)
@@ -441,7 +497,7 @@ def run_cf(b_size, s0_base, c_unit, label, search=True):
             S1 = S97v[i] + nm; P1, s01 = eq(S1)
             if P1 is None: return None
             CS1 = Md * (-np.log(s01)) / aP; PS1 = (P1 * S1).sum(); dN = S1.sum() - S[i].sum()
-            return {'dN': dN, 'dCS': CS1 - CS0, 'dPS': PS1 - PS0, 'dCost': c_unit * dN, 'dW': CS1 - CS0 + PS1 - PS0 - c_unit * dN,
+            return {'dN': dN, 'dCS': CS1 - CS0, 'dPS': PS1 - PS0, 'dCost': c_i * dN, 'dW': CS1 - CS0 + PS1 - PS0 - c_i * dN,
                     'dlnP': np.log(np.maximum(P1, 1e-6)) - np.log(P0), 'P1': P1, 'S1': S1, 's0': s01}
         rd = {'aP': round(aP, 4), 'Pbar': round(Pbar, 3), 'M': round(Md), 'simple': {}}
         for q in (0.1, 0.25, 0.5):
@@ -460,10 +516,10 @@ def run_cf(b_size, s0_base, c_unit, label, search=True):
             for _ in range(3): best = minimize(obj, best.x, method='Nelder-Mead', options={'maxiter': 20000, 'xatol': 1e-9, 'fatol': 1e-7})
             nmo = unpack(best.x); o = outcome(nmo)
             # first-order check: (P_s - c)/m2_s should be equalised across sizes with positive construction
-            wedge = (o['P1'] - c_unit) / m2[i]
+            wedge = (o['P1'] - c_i) / m2[i]
             rd['optimal'] = {'floor_share': (nmo * m2[i] / fa[i]).round(4).tolist(), 'actual_floor_share': sh0.round(4).tolist(),
                              'net_value_per_m2_k': (wedge * 1000).round(3).tolist(),
-                             'baseline_net_value_per_m2_k': ((P0 - c_unit) / m2[i] * 1000).round(3).tolist(),
+                             'baseline_net_value_per_m2_k': ((P0 - c_i) / m2[i] * 1000).round(3).tolist(), 'c': round(float(c_i), 4),
                              **{k_: (round(float(v), 4) if np.isscalar(v) else np.round(v, 4).tolist()) for k_, v in o.items() if k_ not in ('S1', 'P1')}}
             for k_ in tot['optimal']: tot['optimal'][k_] += o[k_]
         res['district'][DLAB[d_]] = rd
@@ -498,5 +554,10 @@ for bl, bt in B_SIZE.items():
 for bl, bt in B_LOW.items():
     for c_ in (0.0, C_TRUE, 0.05, 0.10, C_COST_P, 0.15, C_COST, 0.30):
         OUT['cf'][f'{bl}|s0=0.2|c={c_}'] = run_cf(bt, 0.2, c_, f'{bl} s0=0.2 c={c_}', search=True)
+OUT['cf_regional'] = {}
+for p_ in (0.0, 0.5, 1.0):
+    cr_ = c_reg(p_, CI_RATIO)
+    for bl, bt in B_SIZE.items():
+        OUT['cf_regional'][f'{bl}|s0=0.2|p={p_}'] = run_cf(bt, 0.2, cr_, f'{bl} s0=0.2 regional c, parking p={p_}', search=True)
 json.dump(OUT, open('size_paper.json', 'w'), ensure_ascii=False, default=lambda o: o.tolist() if hasattr(o, 'tolist') else float(o))
 print('done', round(time.time() - t0), 's')
