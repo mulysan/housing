@@ -381,7 +381,7 @@ for d_ in DIST:
     cstar_now[DLAB[d_]] = {s_: round(float((Pn[s_]*a4 - p4*M2n.loc[d_, s_]) / (a4 - M2n.loc[d_, s_])), 4) for s_ in ['1-2', '3']} | \
         {'p_small': round(float(Pn['1-2']), 4), 'p_3': round(float(Pn['3']), 4)}
 P_RATIO = float(base.price.median() / now.price.median())
-CI = pd.read_csv('/home/user/-econ-research-wiki/raw/data/construction-input-index/construction_input_index_monthly.csv').groupby('year').b2004.mean()
+CI = pd.read_csv('/home/user/-econ-research-wiki/raw/data/construction-input-index/cbs_input_index_monthly.csv').groupby('year').idx_jul2025.mean()   # CBS series 200010, July 2025 = 100
 CI_RATIO = float(CI.loc[2017:2019].mean() / CI.loc[2024])          # CBS residential construction input index, 2017-19 vs 2024
 C_COST = round(float(_F / 1e6 * CI_RATIO), 4)                       # F in 2017-19 construction costs (baseline)
 C_COST_P = round(float(_F / 1e6 * P_RATIO), 4)                      # F scaled by house prices instead (robustness)
