@@ -309,6 +309,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
       <div class="chart"><h3>פער במחיר למ"ר מול דירה של 70–80 מ"ר באותו בניין</h3><svg id="sgrad" viewBox="0 0 560 250" role="img" aria-label="מחיר למטר לפי גודל דירה"></svg></div>
       <div class="chart"><h3>פער במחיר למ"ר מול דירת 3 חדרים באותו בניין</h3><svg id="rgrad" viewBox="0 0 560 250" role="img" aria-label="מחיר למטר לפי מספר חדרים"></svg></div>
     </div>
+    <p class="lede" style="font-size:13px;border-inline-start:3px solid var(--warm);padding-inline-start:10px"><b>הסתייגות:</b> מחיר גבוה יותר למ"ר בדירות קטנות אינו מעיד כשלעצמו שכדאי לבנות יותר דירות קטנות. חלוקת אותו שטח בנוי לדירות רבות יותר מוסיפה עלויות שנלוות לכל דירה: מטבח, חדרי רחצה, ממ"ד, מערכות, שטחים משותפים ולעתים חניה. גם עלות הבנייה למ"ר שונה בין אזורים ובין סוגי בניינים. כדי לשפוט אם תמהיל הגדלים יעיל, צריך לשקלל את פער המחיר מול עלויות הבנייה האלה.</p>
     <div class="method"><b>איך זה חושב</b><div class="eq" dir="ltr">ln(<i>P</i>/m²)<sub><i>i</i></sub> = Σ<sub><i>k</i></sub> φ<sub><i>k</i></sub>·1[m²<sub><i>i</i></sub> ∈ bin<sub><i>k</i></sub>] + α<sub><i>b</i>(<i>i</i>)</sub> + τ<sub><i>y</i>(<i>i</i>)</sub> + ε<sub><i>i</i></sub>,   gap<sub><i>k</i></sub> = exp(φ̂<sub><i>k</i></sub> − φ̂<sub>70–80</sub>) − 1</div><p>אותו בניין (<i>b</i>) ואותה שנה (<i>y</i>). התרשים השמאלי זהה, עם דמי למספר החדרים (מעוגל למעלה) במקום קבוצות השטח, והבסיס 3 חדרים.</p></div>
   </section>
 
@@ -499,6 +500,7 @@ dialog#areaDlg::backdrop{background:rgba(44,62,80,.55)}
     <div class="chart"><h3>(ג) כל הארץ, 5+ חדרים מול 1–2 חדרים: מחיר יחסי מול מלאי יחסי, שנה אחר שנה</h3>
       <svg id="szkmC" viewBox="0 0 1120 300" role="img" aria-label="מסלול ארצי של מחיר יחסי מול מלאי יחסי"></svg></div>
     <p class="lede" style="font-size:12.5px" id="sznote"></p>
+    <p class="lede" style="font-size:13px;border-inline-start:3px solid var(--warm);padding-inline-start:10px"><b>הסתייגות:</b> מחיר גבוה יותר למ"ר בדירות קטנות אינו מעיד כשלעצמו שכדאי לבנות יותר דירות קטנות. חלוקת אותו שטח בנוי לדירות רבות יותר מוסיפה עלויות שנלוות לכל דירה: מטבח, חדרי רחצה, ממ"ד, מערכות, שטחים משותפים ולעתים חניה. גם עלות הבנייה למ"ר שונה בין אזורים ובין סוגי בניינים. כדי לשפוט אם תמהיל הגדלים יעיל, צריך לשקלל את פער המחיר מול עלויות הבנייה האלה.</p>
     <div class="method"><b>איך זה חושב</b>
       <div class="eq" dir="ltr">ln <i>P<sub>jt</sub></i> = θ<sub><i>t</i></sub> + δ<sub><i>j</i></sub> + γ<sub><i>j</i></sub><i>t</i> − (1/σ)·ln <i>S</i><sub><i>j</i>,<i>t</i>−1</sub> + <i>u<sub>jt</sub></i></div>
       <div class="eq" dir="ltr"><i>N<sub>jt</sub></i> = Σ<sub><i>i</i>∈<i>j</i>, built≤<i>t</i></sub> 1,   <i>F<sub>jt</sub></i> = Σ m²<sub><i>i</i></sub>,   <i>E<sub>jt</sub></i> = Σ <i>v<sub>i</sub></i>/<i>v̄</i></div>

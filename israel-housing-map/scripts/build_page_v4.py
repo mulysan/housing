@@ -58,16 +58,16 @@ def points():
 # housing is); log scale for the variables the variable map draws on a log scale.
 SA_VARS = ['junc_dens', 'units_dens', 'pop_dens', 'junc_dens_walk', 'junc_dens_cad', 'street_dens', 'deadend_share', 'fourway_share',
            'orient_ent', 'circuity', 'road_share', 'parcel_med', 'mix', 'comm_share', 'comm_dens', 'parking_dens',
-           'parking_share', 'bus_dens', 'school_dens', 'ses21', 'haredi', 'arab', 'turnout', 'fe_var', 'fe_var_adj']
+           'parking_share', 'bus_dens', 'school_dens', 'ses21', 'haredi', 'arab', 'turnout', 'fe_var']
 SHARE = {'deadend_share', 'fourway_share', 'road_share', 'comm_share', 'parking_share', 'haredi', 'arab', 'turnout'}
 LOGV = {'units_dens', 'pop_dens', 'junc_dens_walk', 'junc_dens_cad', 'street_dens', 'parcel_med', 'comm_dens', 'parking_dens', 'bus_dens', 'school_dens'}
 def sig(x, k=4):
     return None if x is None or not np.isfinite(x) else float(f'{x:.{k}g}')
 def sa_ineq():   # within-SA inequality of building values (same definitions as build_varmap.py)
     B_ = pd.read_csv('bld_fe.csv'); B_ = B_[(B_.n >= 3) & B_.fe.notna() & B_.si.notna() & (B_.loc_q <= 4)]
-    s2 = json.load(open('fe_noise.json'))['sigma2']; g = B_.assign(w1=B_.n*B_.fe, w2=B_.n*B_.fe**2).groupby('si')
+    g = B_.assign(w1=B_.n*B_.fe, w2=B_.n*B_.fe**2).groupby('si')
     N = g.n.sum(); m = g.w1.sum()/N; v = g.w2.sum()/N - m**2; nb = g.size()
-    return pd.DataFrame({'fe_var': v.where(nb >= 5), 'fe_var_adj': (v - s2*nb/N).clip(lower=0).where(nb >= 5)})
+    return pd.DataFrame({'fe_var': v.where(nb >= 5)})
 def sa_table(P):
     U = pd.read_csv('sa_urban.csv').set_index('si').join(sa_ineq())
     nsi = int(U.index.max()) + 1

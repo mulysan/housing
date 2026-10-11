@@ -48,11 +48,8 @@ S['yr_u'] = b[b.yr.notna()].assign(z=lambda d: d.yr*d.units).groupby('sa').z.sum
 S['u80'] = b[b.yr < 1980].groupby('sa').units.sum()
 S['uren'] = b[(b.yr < 1980) & b.fl.between(1, 4)].groupby('sa').units.sum(); S['uboth'] = b[b.yr.notna() & (b.fl > 0)].groupby('sa').units.sum()
 f = b[b.n >= 3]; S['fe_n'] = f.groupby('sa').n.sum(); S['fe_sum'] = f.assign(z=lambda d: d.fe*d.n).groupby('sa').z.sum()
-# within-unit inequality of building values: deal-weighted variance of building effects, and net of estimation
-# noise (sigma2/n_b per building, sigma2 = residual variance of the building-FE regression, build_fe_noise.py)
-_s2 = json.load(open('fe_noise.json'))['sigma2']
+# within-unit inequality of building values: deal-weighted variance of (log) building effects
 S['fe_sum2'] = f.assign(z=lambda d: d.fe**2*d.n).groupby('sa').z.sum(); S['fe_b'] = f.groupby('sa').size()
-S['fe_noise'] = f.assign(z=lambda d: _s2/d.n*d.n).groupby('sa').z.sum()        # sum_b n_b x sigma2/n_b
 v = b[b.unit_val.notna()]; S['val'] = v.assign(z=lambda d: d.unit_val*d.units).groupby('sa').z.sum(); S['uval'] = v.groupby('sa').units.sum()
 for c in ['d_cbd', 'd_rail', 'd_coast']:
     w = b[b[c].notna()]; S[c+'_s'] = w.assign(z=lambda d: d[c]*d.units).groupby('sa').z.sum(); S[c+'_u'] = w.groupby('sa').units.sum()
@@ -85,7 +82,6 @@ def agg(df):
         'yr_mean': sd(df.yr_u.sum(), df.uyr.sum()), 'pre1980': sd(df.u80.sum(), df.uyr.sum()), 'renewal': sd(df.uren.sum(), df.uboth.sum()),
         'fe': np.exp(sd(df.fe_sum.sum(), df.fe_n.sum())) - 1 if df.fe_n.sum() >= 3 else np.nan,
         'fe_var': (sd(df.fe_sum2.sum(), df.fe_n.sum()) - sd(df.fe_sum.sum(), df.fe_n.sum())**2) if df.fe_b.sum() >= 5 else np.nan,
-        'fe_var_adj': max(sd(df.fe_sum2.sum(), df.fe_n.sum()) - sd(df.fe_sum.sum(), df.fe_n.sum())**2 - sd(df.fe_noise.sum(), df.fe_n.sum()), 0.0) if df.fe_b.sum() >= 5 else np.nan,
         'unit_val': sd(df.val.sum(), df.uval.sum()), 'value_bn': df.val.sum()/1e9,
         'd_cbd': sd(df.d_cbd_s.sum(), df.d_cbd_u.sum()), 'd_rail': sd(df.d_rail_s.sum(), df.d_rail_u.sum()), 'd_coast': sd(df.d_coast_s.sum(), df.d_coast_u.sum()),
     }
@@ -101,7 +97,7 @@ STATIC = [  # key, label, unit, log scale for bins
   ('comm_share', 'שיעור מסחר ומשרדים', '%', False), ('ses21', 'אשכול חברתי־כלכלי 2021', '', False), ('fl_mean', 'קומות בבניין (ממוצע)', '', False),
   ('share_9', 'דירות בבניינים של 9+ קומות', '%', False), ('yr_mean', 'שנת בנייה (ממוצע משוקלל)', '', False), ('pre1980', 'דירות בבניינים מלפני 1980', '%', False),
   ('renewal', 'דירות ישנות ונמוכות (פוטנציאל התחדשות)', '%', False), ('fe', 'אפקט קבוע של בניין (ממוצע)', '%', False),
-  ('fe_var', 'אי־שוויון: שונות אפקט הבניין ביחידה', '', False), ('fe_var_adj', 'אי־שוויון: שונות אפקט הבניין, בניכוי רעש האמידה', '', False),
+  ('fe_var', 'אי־שוויון: שונות אפקט הבניין ביחידה', '', False),
   ('unit_val', 'שווי דירה ממוצע (₪)', '₪', True), ('value_bn', 'שווי מלאי הדירות (מיליארד ₪)', '', True),
   ('d_cbd', 'מרחק למרכז תל אביב (ק"מ)', '', True), ('d_rail', 'מרחק לתחנת רכבת או רק"ל (ק"מ)', '', True), ('d_coast', 'מרחק לחוף (ק"מ)', '', True)]
 
