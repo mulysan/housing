@@ -456,6 +456,39 @@ reg_out['scenarios']['ta_incl_parking'] = {'c_2024': c24t, 'c_2017_19': c18t,
                             '3': round((cstar_now[k_]['3'] - c24t[k_]) / cstar_now[k_]['p_3'], 4)} for k_ in c24t}}
 print('  TA incl. parking: c 2024', c24t, 'mu 2023-25', reg_out['scenarios']['ta_incl_parking']['mu_2023_25'], flush=True)
 OUT['construction_cost_regional'] = reg_out
+# NEW vs SECOND-HAND (author, 2026-10-11): gradients, c* and mu separately for sales of new dwellings (building age
+# 0-2 at sale, Tax Authority building year) and resales (age >= 3); sales with unknown building year dropped.
+# Within building x year FE, size classes 1-2/3/4/5+ (vs 4), 2020-2025 by district; prices and m2: 2023-2025
+# medians of the same group; cost: Tel Aviv incl. parking scaled by region (c24t).
+_yb = A.yb.astype('float64'); A['age_s'] = (A.y.astype('float64') - _yb).where(_yb.between(1870, 2026))
+A['grp'] = np.select([A.age_s.between(0, 2), A.age_s >= 3], ['new', 'resale'], 'na')
+nvr = {}
+for grp_ in ('new', 'resale'):
+    g_all = A[(A.grp == grp_) & A.s.notna() & A.district.isin(DIST)]
+    out_ = {'national_rooms': {}, 'district': {}}
+    d = g_all[g_all.y.between(2013, 2025) & g_all.rc.notna()]; d = d[d.groupby('bld').bld.transform('size') >= 2]
+    by = codes(d.bld.astype(str) + '#' + d.y.astype(str)); fes, _ = fe_solve(d.lp.values, [d.rc.values.astype(int), by])
+    out_['national_rooms'] = {int(k_): round(float(np.exp(fes[0][k_] - fes[0][4]) - 1), 4) for k_ in range(1, 8) if (d.rc == k_).sum() > 200}
+    out_['n_2013_25'] = int(len(d))
+    d = g_all[g_all.y.between(2020, 2025)]; d = d[d.groupby('bld').bld.transform('size') >= 2]
+    now_ = g_all[g_all.y.between(2023, 2025)]
+    for d_, gg in d.groupby('district'):
+        by = codes(gg.bld.astype(str) + '#' + gg.y.astype(str)); sc = pd.Categorical(gg.s, categories=SIZES).codes.astype(int)
+        cnt = np.bincount(sc, minlength=4)
+        fes, _ = fe_solve(gg.lp.values, [sc, by]); gr2 = [float(np.exp(v - fes[0][2]) - 1) for v in fes[0]]
+        nn = now_[now_.district == d_]
+        p4 = nn[nn.s == '4'].price.median() / 1e6; m2_ = nn.groupby('s').area.median() / 1.08
+        k_ = DLAB[d_]; c_ = c24t[k_]; res_ = {'grad': [round(x, 4) for x in gr2], 'n': cnt.tolist(), 'p4': round(float(p4), 3), 'm2': {q: round(float(m2_.get(q, np.nan)), 1) for q in SIZES}}
+        for s_, j_ in (('1-2', 0), ('3', 1)):
+            if cnt[j_] < 100 or s_ not in m2_ or '4' not in m2_: continue
+            ps = p4 * (m2_[s_] / m2_['4']) * (1 + gr2[j_]); cs_ = (ps * m2_['4'] - p4 * m2_[s_]) / (m2_['4'] - m2_[s_])
+            res_[s_] = {'p_small': round(float(ps), 3), 'c_star': round(float(cs_), 4), 'mu': round(float(cs_ - c_), 4), 'mu_pct': round(float((cs_ - c_) / ps), 4)}
+        out_['district'][k_] = res_
+    nvr[grp_] = out_
+    print('  ', grp_, 'rooms gradient 2013-25', out_['national_rooms'], 'n', out_['n_2013_25'], flush=True)
+    for k_, r_ in out_['district'].items():
+        print('     ', k_, 'grad', r_['grad'], 'n', r_['n'], {s_: (r_[s_]['c_star'], r_[s_]['mu'], r_[s_]['mu_pct']) for s_ in ('1-2', '3') if s_ in r_}, flush=True)
+OUT['new_vs_resale'] = nvr
 print('  regional cost index', REG_IDX, 'underground 2024', {k_: round(v) for k_, v in U24.items()}, flush=True)
 for p_ in (0.0, 0.5, 1.0): print(f'  p={p_} mu 2023-25', reg_out['scenarios'][f'p={p_}']['mu_2023_25'], flush=True)
 S19 = pd.DataFrame({d_: SD[d_].loc[2019] for d_ in DIST}).T[SIZES]
