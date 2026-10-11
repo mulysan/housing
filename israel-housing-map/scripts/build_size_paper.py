@@ -381,12 +381,17 @@ for d_ in DIST:
     cstar_now[DLAB[d_]] = {s_: round(float((Pn[s_]*a4 - p4*M2n.loc[d_, s_]) / (a4 - M2n.loc[d_, s_])), 4) for s_ in ['1-2', '3']} | \
         {'p_small': round(float(Pn['1-2']), 4), 'p_3': round(float(Pn['3']), 4)}
 P_RATIO = float(base.price.median() / now.price.median())
-C_COST = round(float(_F / 1e6 * P_RATIO), 4)
+CI = pd.read_csv('/home/user/-econ-research-wiki/raw/data/construction-input-index/construction_input_index_monthly.csv').groupby('year').b2004.mean()
+CI_RATIO = float(CI.loc[2017:2019].mean() / CI.loc[2024])          # CBS residential construction input index, 2017-19 vs 2024
+C_COST = round(float(_F / 1e6 * CI_RATIO), 4)                       # F in 2017-19 construction costs (baseline)
+C_COST_P = round(float(_F / 1e6 * P_RATIO), 4)                      # F scaled by house prices instead (robustness)
 OUT['construction_cost'] = {'F_nis': round(float(_F)), 'v_nis_m2': round(float(_v)), 'price_ratio_2018_to_2024': round(P_RATIO, 4),
-                            'F_in_2017_19_prices_musd': C_COST, 'c_star_2023_25': cstar_now,
+                            'F_in_2017_19_prices_musd': C_COST_P, 'cost_index_ratio_2017_19_to_2024': round(CI_RATIO, 4),
+                            'F_in_2017_19_costs_musd': C_COST, 'cost_index_annual': {int(k_): round(float(v), 3) for k_, v in CI.items()},
+                            'mu_2017_19': {DLAB[d_]: {s_: round(cstar[DLAB[d_]][s_] - C_COST, 4) for s_ in ['1-2', '3']} for d_ in DIST}, 'c_star_2023_25': cstar_now,
                             'mu_2023_25': {k_: {s_: round(v[s_] - _F/1e6, 4) for s_ in ['1-2', '3']} for k_, v in cstar_now.items()},
                             'gradient_district_2020_25': {DLAB[k_]: [round(x, 4) for x in v] for k_, v in gd2.items()}}
-print('  construction cost: F', round(_F), 'v', round(_v), 'price ratio', round(P_RATIO, 3), 'F in 2017-19 prices', C_COST, flush=True)
+print('  construction cost: F', round(_F), 'v', round(_v), 'cost-index ratio', round(CI_RATIO, 3), 'F 2017-19 costs', C_COST, '| price ratio', round(P_RATIO, 3), C_COST_P, flush=True)
 print('  c* 2023-25', cstar_now, flush=True)
 S19 = pd.DataFrame({d_: SD[d_].loc[2019] for d_ in DIST}).T[SIZES]
 S97 = pd.DataFrame({d_: SD[d_].loc[1997] for d_ in DIST}).T[SIZES]
@@ -488,10 +493,10 @@ B_SIZE = {'district_x_year': KM['own_dt']['b'][0], 'national': KM['nat_fe']['b']
 B_LOW = {'b=-0.5': -0.5, 'b=-1.09 (market trends)': KM['own_dt_trend']['b'][0]}
 for bl, bt in B_SIZE.items():
     for s0_ in (0.1, 0.2, 0.3):
-        for c_ in (0.0, C_TRUE, 0.05, 0.10, 0.15, C_COST, 0.30):
+        for c_ in (0.0, C_TRUE, 0.05, 0.10, C_COST_P, 0.15, C_COST, 0.30):
             OUT['cf'][f'{bl}|s0={s0_}|c={c_}'] = run_cf(bt, s0_, c_, f'{bl} s0={s0_} c={c_}', search=True)
 for bl, bt in B_LOW.items():
-    for c_ in (0.0, C_TRUE, 0.05, 0.10, 0.15, C_COST, 0.30):
+    for c_ in (0.0, C_TRUE, 0.05, 0.10, C_COST_P, 0.15, C_COST, 0.30):
         OUT['cf'][f'{bl}|s0=0.2|c={c_}'] = run_cf(bt, 0.2, c_, f'{bl} s0=0.2 c={c_}', search=True)
 json.dump(OUT, open('size_paper.json', 'w'), ensure_ascii=False, default=lambda o: o.tolist() if hasattr(o, 'tolist') else float(o))
 print('done', round(time.time() - t0), 's')
