@@ -356,6 +356,38 @@ for i_, d_ in enumerate(DIST):
     cstar[DLAB[d_]] = {s_: round(float((PRC.loc[d_, s_]*a4 - p4*M2.loc[d_, s_]) / (a4 - M2.loc[d_, s_])), 4) for s_ in ['1-2', '3', '5+']}
 OUT['c_star'] = cstar
 print('  break-even per-unit cost c* (NIS m) vs 4 rooms', cstar, flush=True)
+# CONSTRUCTION COST BY DWELLING SIZE (large developer, raw/data/construction-cost-by-size): cost per net m2
+# for 72-118 m2 units fits total cost = F + v m almost exactly (R2 0.999): F ~ NIS 202K per dwelling,
+# v ~ NIS 4,344 per m2. At fixed floor area the variable part cancels, so the construction cost of an extra
+# dwelling is F. The quotes are taken to be in current (2025) prices, so c* is recomputed with 2023-2025 sale
+# prices and 2020-2025 within-building gradients; in the 2019-calibrated counterfactual F is scaled by the ratio
+# of 2017-19 to 2023-25 median prices (keeping the cost-to-price ratio).
+CC = pd.read_csv('/home/user/-econ-research-wiki/raw/data/construction-cost-by-size/cost_by_size.csv')
+_v, _F = np.polyfit(CC.net_area_m2, CC.net_area_m2 * CC.cost_per_m2_nis, 1)
+gd2 = {}
+d = A[A.y.between(2020, 2025) & A.s.notna() & A.district.isin(DIST)]
+d = d[d.groupby('bld').bld.transform('size') >= 2]
+for d_, g_ in d.groupby('district'):
+    by = codes(g_.bld.astype(str) + '#' + g_.y.astype(str)); sc = pd.Categorical(g_.s, categories=SIZES).codes.astype(int)
+    fes, _ = fe_solve(g_.lp.values, [sc, by]); f_ = fes[0] - fes[0][2]
+    gd2[d_] = [float(np.exp(v) - 1) for v in f_]
+now = A[A.y.between(2023, 2025) & A.s.notna() & A.district.isin(DIST)]
+P4n = now[now.s == '4'].groupby('district').price.median() / 1e6
+M2n = now.groupby(['district', 's']).area.median().unstack().reindex(index=DIST, columns=SIZES) / 1.08
+cstar_now = {}
+for d_ in DIST:
+    a4 = M2n.loc[d_, '4']; p4 = P4n[d_]
+    Pn = {s_: p4 * (M2n.loc[d_, s_] / a4) * (1 + gd2[d_][k_]) for k_, s_ in enumerate(SIZES)}
+    cstar_now[DLAB[d_]] = {s_: round(float((Pn[s_]*a4 - p4*M2n.loc[d_, s_]) / (a4 - M2n.loc[d_, s_])), 4) for s_ in ['1-2', '3']} | \
+        {'p_small': round(float(Pn['1-2']), 4), 'p_3': round(float(Pn['3']), 4)}
+P_RATIO = float(base.price.median() / now.price.median())
+C_COST = round(float(_F / 1e6 * P_RATIO), 4)
+OUT['construction_cost'] = {'F_nis': round(float(_F)), 'v_nis_m2': round(float(_v)), 'price_ratio_2018_to_2024': round(P_RATIO, 4),
+                            'F_in_2017_19_prices_musd': C_COST, 'c_star_2023_25': cstar_now,
+                            'mu_2023_25': {k_: {s_: round(v[s_] - _F/1e6, 4) for s_ in ['1-2', '3']} for k_, v in cstar_now.items()},
+                            'gradient_district_2020_25': {DLAB[k_]: [round(x, 4) for x in v] for k_, v in gd2.items()}}
+print('  construction cost: F', round(_F), 'v', round(_v), 'price ratio', round(P_RATIO, 3), 'F in 2017-19 prices', C_COST, flush=True)
+print('  c* 2023-25', cstar_now, flush=True)
 S19 = pd.DataFrame({d_: SD[d_].loc[2019] for d_ in DIST}).T[SIZES]
 S97 = pd.DataFrame({d_: SD[d_].loc[1997] for d_ in DIST}).T[SIZES]
 NEW = S19 - S97
@@ -456,10 +488,10 @@ B_SIZE = {'district_x_year': KM['own_dt']['b'][0], 'national': KM['nat_fe']['b']
 B_LOW = {'b=-0.5': -0.5, 'b=-1.09 (market trends)': KM['own_dt_trend']['b'][0]}
 for bl, bt in B_SIZE.items():
     for s0_ in (0.1, 0.2, 0.3):
-        for c_ in (0.0, C_TRUE, 0.05, 0.10, 0.15, 0.30):
+        for c_ in (0.0, C_TRUE, 0.05, 0.10, 0.15, C_COST, 0.30):
             OUT['cf'][f'{bl}|s0={s0_}|c={c_}'] = run_cf(bt, s0_, c_, f'{bl} s0={s0_} c={c_}', search=True)
 for bl, bt in B_LOW.items():
-    for c_ in (0.0, C_TRUE, 0.05, 0.10, 0.15, 0.30):
+    for c_ in (0.0, C_TRUE, 0.05, 0.10, 0.15, C_COST, 0.30):
         OUT['cf'][f'{bl}|s0=0.2|c={c_}'] = run_cf(bt, 0.2, c_, f'{bl} s0=0.2 c={c_}', search=True)
 json.dump(OUT, open('size_paper.json', 'w'), ensure_ascii=False, default=lambda o: o.tolist() if hasattr(o, 'tolist') else float(o))
 print('done', round(time.time() - t0), 's')
