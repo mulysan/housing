@@ -444,6 +444,17 @@ for p_ in (0.0, 0.5, 1.0):
     reg_out['scenarios'][f'p={p_}'] = {'c_2024': c24, 'c_2017_19': c18,
         'mu_2023_25': {k_: {s_: round(cstar_now[k_][s_] - c24[k_], 4) for s_ in ['1-2', '3']} for k_ in c24},
         'mu_2017_19': {k_: {s_: round(cstar[k_][s_] - c18[k_], 4) for s_ in ['1-2', '3']} for k_ in c18}}
+# Author's assumption (2026-10-11): the developer's table is for Tel Aviv and includes parking. Then the per-dwelling
+# cost in district d is F x r_d / r_TelAviv, with no separate parking term (baseline scenario 'ta_incl_parking').
+def c_ta(year_ratio):
+    return {k_: round(_F * REG_IDX[k_] / REG_IDX['Tel Aviv'] * year_ratio / 1e6, 4) for k_ in REG_IDX}
+c24t, c18t = c_ta(1.0), c_ta(CI_RATIO)
+reg_out['scenarios']['ta_incl_parking'] = {'c_2024': c24t, 'c_2017_19': c18t,
+    'mu_2023_25': {k_: {s_: round(cstar_now[k_][s_] - c24t[k_], 4) for s_ in ['1-2', '3']} for k_ in c24t},
+    'mu_2017_19': {k_: {s_: round(cstar[k_][s_] - c18t[k_], 4) for s_ in ['1-2', '3']} for k_ in c18t},
+    'mu_pct_2023_25': {k_: {'1-2': round((cstar_now[k_]['1-2'] - c24t[k_]) / cstar_now[k_]['p_small'], 4),
+                            '3': round((cstar_now[k_]['3'] - c24t[k_]) / cstar_now[k_]['p_3'], 4)} for k_ in c24t}}
+print('  TA incl. parking: c 2024', c24t, 'mu 2023-25', reg_out['scenarios']['ta_incl_parking']['mu_2023_25'], flush=True)
 OUT['construction_cost_regional'] = reg_out
 print('  regional cost index', REG_IDX, 'underground 2024', {k_: round(v) for k_, v in U24.items()}, flush=True)
 for p_ in (0.0, 0.5, 1.0): print(f'  p={p_} mu 2023-25', reg_out['scenarios'][f'p={p_}']['mu_2023_25'], flush=True)
@@ -555,6 +566,11 @@ for bl, bt in B_LOW.items():
     for c_ in (0.0, C_TRUE, 0.05, 0.10, C_COST_P, 0.15, C_COST, 0.30):
         OUT['cf'][f'{bl}|s0=0.2|c={c_}'] = run_cf(bt, 0.2, c_, f'{bl} s0=0.2 c={c_}', search=True)
 OUT['cf_regional'] = {}
+for bl, bt in B_SIZE.items():
+    for s0_ in (0.1, 0.2, 0.3):
+        OUT.setdefault('cf_ta', {})[f'{bl}|s0={s0_}'] = run_cf(bt, s0_, c18t, f'{bl} s0={s0_} c = TA cost incl. parking, scaled by region', search=True)
+for bl, bt in B_LOW.items():
+    OUT['cf_ta'][f'{bl}|s0=0.2'] = run_cf(bt, 0.2, c18t, f'{bl} s0=0.2 c = TA cost incl. parking', search=True)
 for p_ in (0.0, 0.5, 1.0):
     cr_ = c_reg(p_, CI_RATIO)
     for bl, bt in B_SIZE.items():
